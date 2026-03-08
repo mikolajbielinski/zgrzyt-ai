@@ -3,10 +3,11 @@ import scrapetube
 import yt_dlp
 
 
-def get_latest_videos(limit=2):
+def get_latest_videos(limit=None):
+    if limit is None:
+        limit = int(os.environ.get("PODCAST_LIMIT", "1"))
     videos = scrapetube.get_channel(channel_username="zgrzytpodcast", limit=limit)
     return [f"https://www.youtube.com/watch?v={video['videoId']}" for video in videos]
-
 
 def progress_hook(d):
     if d["status"] == "downloading":
@@ -18,7 +19,9 @@ def progress_hook(d):
         print(f"\n  Pobrano, konwertowanie do MP3...")
 
 
-def download_audio(urls, output_dir="videos"):
+def download_audio(urls, output_dir=None):
+    if output_dir is None:
+        output_dir = os.environ.get("PODCAST_DIR", "/podcasts")
     os.makedirs(output_dir, exist_ok=True)
     opts = {
         "format": "bestaudio/best",
