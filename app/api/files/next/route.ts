@@ -16,6 +16,7 @@ type Utterance = {
   end: number;
   text: string;
   words: Word[];
+  speaker?: string;
 };
 
 type SpeakerInfo = {
@@ -26,19 +27,16 @@ type SpeakerInfo = {
 function extractSpeakers(data: Utterance[]): Record<string, SpeakerInfo> | null {
   const speakers: Record<string, SpeakerInfo> = {};
 
+  // Scan entire file using utterance-level speaker field
   for (const utterance of data) {
-    for (const word of utterance.words ?? []) {
-      if (word.speaker && SPEAKER_PATTERN.test(word.speaker)) {
-        if (!speakers[word.speaker]) {
-          speakers[word.speaker] = {
-            example: utterance.text.trim(),
-            timestamp: utterance.start,
-          };
-        }
-      }
+    const speakerId = utterance.speaker;
+    if (!speakerId || !SPEAKER_PATTERN.test(speakerId)) continue;
+    if (!speakers[speakerId]) {
+      speakers[speakerId] = {
+        example: utterance.text.trim(),
+        timestamp: utterance.start,
+      };
     }
-    // Stop early if we found at least a few examples
-    if (Object.keys(speakers).length > 0 && utterance.start > 60) break;
   }
 
   if (Object.keys(speakers).length === 0) return null;
