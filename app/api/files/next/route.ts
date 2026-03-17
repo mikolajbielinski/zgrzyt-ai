@@ -19,27 +19,44 @@ type Utterance = {
   speaker?: string;
 };
 
-type SpeakerInfo = {
-  example: string;
+type SpeakerExample = {
+  text: string;
   timestamp: number;
 };
 
-function extractSpeakers(data: Utterance[]): Record<string, SpeakerInfo> | null {
-  const speakers: Record<string, SpeakerInfo> = {};
+type SpeakerInfo = {
+  examples: SpeakerExample[];
+};
 
-  // Scan entire file using utterance-level speaker field
+function extractSpeakers(data: Utterance[]): Record<string, SpeakerInfo> | null {
+  // Collect all utterances per speaker
+  const allUtterances: Record<string, SpeakerExample[]> = {};
+
   for (const utterance of data) {
     const speakerId = utterance.speaker;
     if (!speakerId || !SPEAKER_PATTERN.test(speakerId)) continue;
-    if (!speakers[speakerId]) {
-      speakers[speakerId] = {
-        example: utterance.text.trim(),
-        timestamp: utterance.start,
-      };
-    }
+    if (!allUtterances[speakerId]) allUtterances[speakerId] = [];
+    allUtterances[speakerId].push({
+      text: utterance.text.trim(),
+      timestamp: utterance.start,
+    });
   }
 
-  if (Object.keys(speakers).length === 0) return null;
+  if (Object.keys(allUtterances).length === 0) return null;
+
+  // Pick 3 evenly spaced examples per speaker
+  const speakers: Record<string, SpeakerInfo> = {};
+  for (const [speakerId, utterances] of Object.entries(allUtterances)) {
+    const len = utterances.length;
+    const indices =
+      len <= 3
+        ? [...Array(len).keys()]
+        : [0, Math.floor(len / 2), len - 1];
+    speakers[speakerId] = {
+      examples: indices.map((i) => utterances[i]),
+    };
+  }
+
   return speakers;
 }
 
@@ -52,7 +69,11 @@ export async function GET(request: NextRequest) {
   try {
     const files = await listTranscriptFiles();
 
+    const skippedRaw = request.cookies.get("skipped_files")?.value;
+    const skipped: string[] = skippedRaw ? JSON.parse(skippedRaw) : [];
+
     for (const id of files) {
+      if (skipped.includes(id)) continue;
       const data = (await getTranscriptFile(id)) as Utterance[];
       const speakers = extractSpeakers(data);
       if (speakers) {

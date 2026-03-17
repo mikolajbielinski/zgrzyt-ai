@@ -2,9 +2,13 @@
 
 import { useEffect, useState, useRef } from "react";
 
-type SpeakerInfo = {
-  example: string;
+type SpeakerExample = {
+  text: string;
   timestamp: number;
+};
+
+type SpeakerInfo = {
+  examples: SpeakerExample[];
 };
 
 type FileData = {
@@ -110,8 +114,8 @@ function LabelingUI() {
       return;
     }
     setFileData(data);
-    // Set initial YT timestamp to first speaker's timestamp
-    const firstTs = Object.values(data.speakers as Record<string, SpeakerInfo>)[0]?.timestamp ?? 0;
+    // Set initial YT timestamp to first speaker's first example
+    const firstTs = Object.values(data.speakers as Record<string, SpeakerInfo>)[0]?.examples[0]?.timestamp ?? 0;
     setYtTimestamp(Math.floor(firstTs));
   }
 
@@ -127,6 +131,19 @@ function LabelingUI() {
       const sep = src.includes("?") ? "&" : "?";
       iframeRef.current.src = `${src}${sep}start=${Math.floor(ts)}`;
     }
+  }
+
+  function handleSkip() {
+    if (!fileData) return;
+    const raw = document.cookie
+      .split("; ")
+      .find((c) => c.startsWith("skipped_files="))
+      ?.split("=")[1];
+    const skipped: string[] = raw ? JSON.parse(decodeURIComponent(raw)) : [];
+    if (!skipped.includes(fileData.id)) skipped.push(fileData.id);
+    const expires = new Date(Date.now() + 60 * 60 * 1000).toUTCString();
+    document.cookie = `skipped_files=${encodeURIComponent(JSON.stringify(skipped))}; expires=${expires}; path=/`;
+    loadNext();
   }
 
   async function handleSave() {
@@ -209,21 +226,27 @@ function LabelingUI() {
               key={speakerId}
               className="rounded-lg border border-gray-800 bg-gray-900 p-4"
             >
-              <div className="mb-2 flex items-center justify-between">
+              <div className="mb-3">
                 <span className="font-mono text-sm font-medium text-blue-400">
                   {speakerId}
                 </span>
-                <button
-                  onClick={() => setTimestamp(info.timestamp)}
-                  className="rounded bg-gray-800 px-2 py-1 text-xs text-gray-400 hover:bg-gray-700 hover:text-gray-200"
-                  title="Kliknij aby przejść do tego momentu w filmiku"
-                >
-                  {formatTime(info.timestamp)}
-                </button>
               </div>
-              <p className="mb-3 text-sm italic text-gray-400 line-clamp-2">
-                &ldquo;{info.example}&rdquo;
-              </p>
+              <div className="mb-3 space-y-2">
+                {info.examples.map((ex, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <button
+                      onClick={() => setTimestamp(ex.timestamp)}
+                      className="mt-0.5 shrink-0 rounded bg-gray-800 px-2 py-0.5 text-xs text-gray-400 hover:bg-gray-700 hover:text-gray-200"
+                      title="Kliknij aby przejść do tego momentu"
+                    >
+                      {formatTime(ex.timestamp)}
+                    </button>
+                    <p className="text-sm italic text-gray-400 line-clamp-2">
+                      &ldquo;{ex.text}&rdquo;
+                    </p>
+                  </div>
+                ))}
+              </div>
               <input
                 type="text"
                 placeholder="Wpisz ksywkę..."
@@ -237,13 +260,22 @@ function LabelingUI() {
           ))}
         </div>
 
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="mt-6 w-full rounded bg-blue-600 px-4 py-3 font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-        >
-          {saving ? "Zapisywanie..." : "Zapisz i następny"}
-        </button>
+        <div className="mt-6 flex gap-3">
+          <button
+            onClick={handleSkip}
+            disabled={saving}
+            className="rounded border border-gray-700 px-4 py-3 font-medium text-gray-400 hover:border-gray-500 hover:text-gray-200 disabled:opacity-50"
+          >
+            Pomiń (1h)
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex-1 rounded bg-blue-600 px-4 py-3 font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {saving ? "Zapisywanie..." : "Zapisz i następny"}
+          </button>
+        </div>
       </div>
 
       {/* Right panel — YouTube */}
