@@ -67,7 +67,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const direction = request.nextUrl.searchParams.get("direction") ?? "desc";
     const files = await listTranscriptFiles();
+    if (direction === "desc") files.reverse();
 
     const skippedRaw = request.cookies.get("skipped_files")?.value;
     const skipped: string[] = skippedRaw ? JSON.parse(skippedRaw) : [];

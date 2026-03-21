@@ -96,13 +96,15 @@ function LabelingUI() {
   const [error, setError] = useState("");
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [ytTimestamp, setYtTimestamp] = useState(0);
+  const [direction, setDirection] = useState<"asc" | "desc">("desc");
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  async function loadNext() {
+  async function loadNext(dir?: "asc" | "desc") {
     setLoading(true);
     setError("");
     setMapping({});
-    const res = await fetch("/api/files/next");
+    const d = dir ?? direction;
+    const res = await fetch(`/api/files/next?direction=${d}`);
     setLoading(false);
     if (!res.ok) {
       setError("Błąd ładowania pliku z S3");
@@ -209,9 +211,22 @@ function LabelingUI() {
       <div className="flex w-1/2 flex-col overflow-y-auto border-r border-gray-800 p-6">
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-lg font-semibold text-gray-100">Speaker Labeler</h1>
-          <span className="rounded bg-gray-800 px-2 py-1 text-xs text-gray-400">
-            {fileData.id}
-          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                const next = direction === "desc" ? "asc" : "desc";
+                setDirection(next);
+                loadNext(next);
+              }}
+              className="rounded border border-gray-700 px-2 py-1 text-xs text-gray-400 hover:border-gray-500 hover:text-gray-200"
+              title={direction === "desc" ? "Od tyłu (kliknij aby od początku)" : "Od początku (kliknij aby od tyłu)"}
+            >
+              {direction === "desc" ? "↑ od tyłu" : "↓ od początku"}
+            </button>
+            <span className="rounded bg-gray-800 px-2 py-1 text-xs text-gray-400">
+              {fileData.id}
+            </span>
+          </div>
         </div>
 
         {error && (
