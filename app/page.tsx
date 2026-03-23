@@ -11,15 +11,9 @@ type SpeakerInfo = {
   examples: SpeakerExample[];
 };
 
-type Progress = {
-  done: number;
-  total: number;
-};
-
 type FileData = {
   id: string;
   speakers: Record<string, SpeakerInfo>;
-  progress: Progress;
 };
 
 function formatTime(seconds: number): string {
@@ -218,12 +212,7 @@ function LabelingUI() {
       {/* Left panel */}
       <div className="flex w-1/2 flex-col overflow-y-auto border-r border-gray-800 p-6">
         <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-lg font-semibold text-gray-100">Speaker Labeler</h1>
-            <span className="rounded bg-gray-800 px-2 py-1 text-xs text-gray-400">
-              {fileData.progress.done}/{fileData.progress.total} done
-            </span>
-          </div>
+          <h1 className="text-lg font-semibold text-gray-100">Speaker Labeler</h1>
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
