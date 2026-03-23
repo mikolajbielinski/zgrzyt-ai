@@ -97,12 +97,14 @@ function LabelingUI() {
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [ytTimestamp, setYtTimestamp] = useState(0);
   const [direction, setDirection] = useState<"asc" | "desc">("desc");
+  const [visibleCount, setVisibleCount] = useState<Record<string, number>>({});
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   async function loadNext(dir?: "asc" | "desc") {
     setLoading(true);
     setError("");
     setMapping({});
+    setVisibleCount({});
     const d = dir ?? direction;
     const res = await fetch(`/api/files/next?direction=${d}`);
     setLoading(false);
@@ -247,7 +249,7 @@ function LabelingUI() {
                 </span>
               </div>
               <div className="mb-3 space-y-2">
-                {info.examples.map((ex, i) => (
+                {info.examples.slice(0, visibleCount[speakerId] ?? 3).map((ex, i) => (
                   <div key={i} className="flex items-start gap-2">
                     <button
                       onClick={() => setTimestamp(ex.timestamp)}
@@ -261,6 +263,19 @@ function LabelingUI() {
                     </p>
                   </div>
                 ))}
+                {info.examples.length > (visibleCount[speakerId] ?? 3) && (
+                  <button
+                    onClick={() =>
+                      setVisibleCount((prev) => ({
+                        ...prev,
+                        [speakerId]: (prev[speakerId] ?? 3) + 5,
+                      }))
+                    }
+                    className="text-xs text-blue-400 hover:text-blue-300"
+                  >
+                    + Załaduj 5 więcej ({info.examples.length - (visibleCount[speakerId] ?? 3)} pozostało)
+                  </button>
+                )}
               </div>
               <input
                 type="text"

@@ -44,17 +44,10 @@ function extractSpeakers(data: Utterance[]): Record<string, SpeakerInfo> | null 
 
   if (Object.keys(allUtterances).length === 0) return null;
 
-  // Pick 3 evenly spaced examples per speaker
+  // Send all utterances per speaker (frontend handles pagination)
   const speakers: Record<string, SpeakerInfo> = {};
   for (const [speakerId, utterances] of Object.entries(allUtterances)) {
-    const len = utterances.length;
-    const indices =
-      len <= 3
-        ? [...Array(len).keys()]
-        : [0, Math.floor(len / 2), len - 1];
-    speakers[speakerId] = {
-      examples: indices.map((i) => utterances[i]),
-    };
+    speakers[speakerId] = { examples: utterances };
   }
 
   return speakers;
