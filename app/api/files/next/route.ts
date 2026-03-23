@@ -67,16 +67,26 @@ export async function GET(request: NextRequest) {
     const skippedRaw = request.cookies.get("skipped_files")?.value;
     const skipped: string[] = skippedRaw ? JSON.parse(skippedRaw) : [];
 
+    const total = files.length;
+    let doneCount = 0;
+    let current: { id: string; speakers: Record<string, SpeakerInfo> } | null = null;
+
     for (const id of files) {
       if (skipped.includes(id)) continue;
       const data = (await getTranscriptFile(id)) as Utterance[];
       const speakers = extractSpeakers(data);
       if (speakers) {
-        return NextResponse.json({ id, speakers });
+        if (!current) current = { id, speakers };
+      } else {
+        doneCount++;
       }
     }
 
-    return NextResponse.json({ done: true });
+    if (!current) {
+      return NextResponse.json({ done: true, progress: { done: doneCount, total } });
+    }
+
+    return NextResponse.json({ ...current, progress: { done: doneCount, total } });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "S3 error" }, { status: 500 });
