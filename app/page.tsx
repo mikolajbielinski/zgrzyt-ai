@@ -98,14 +98,61 @@ function LabelingUI() {
   const [ytTimestamp, setYtTimestamp] = useState(0);
   const [direction, setDirection] = useState<"asc" | "desc">("desc");
   const [visibleCount, setVisibleCount] = useState<Record<string, number>>({});
+  const [prefetched, setPrefetched] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const prefetchRef = useRef<FileData | null | "done">(null);
+
+  function applyFileData(data: FileData) {
+    setFileData(data);
+    setMapping({});
+    setVisibleCount({});
+    const firstTs = Object.values(data.speakers as Record<string, SpeakerInfo>)[0]?.examples[0]?.timestamp ?? 0;
+    setYtTimestamp(Math.floor(firstTs));
+  }
+
+  async function prefetchNext(currentId: string, dir: "asc" | "desc") {
+    setPrefetched(false);
+    prefetchRef.current = null;
+    try {
+      const res = await fetch(`/api/files/next?direction=${dir}&exclude=${encodeURIComponent(currentId)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.done) {
+        prefetchRef.current = "done";
+      } else {
+        prefetchRef.current = data as FileData;
+      }
+      setPrefetched(true);
+    } catch {
+      // prefetch failed silently — will fall back to normal load
+    }
+  }
 
   async function loadNext(dir?: "asc" | "desc") {
+    const d = dir ?? direction;
+
+    // If we have prefetched data, use it instantly
+    if (prefetchRef.current) {
+      if (prefetchRef.current === "done") {
+        setDone(true);
+        prefetchRef.current = null;
+        setPrefetched(false);
+        return;
+      }
+      const next = prefetchRef.current;
+      prefetchRef.current = null;
+      setPrefetched(false);
+      applyFileData(next);
+      setLoading(false);
+      // Prefetch the one after this
+      prefetchNext(next.id, d);
+      return;
+    }
+
     setLoading(true);
     setError("");
     setMapping({});
     setVisibleCount({});
-    const d = dir ?? direction;
     const res = await fetch(`/api/files/next?direction=${d}`);
     setLoading(false);
     if (!res.ok) {
@@ -117,10 +164,9 @@ function LabelingUI() {
       setDone(true);
       return;
     }
-    setFileData(data);
-    // Set initial YT timestamp to first speaker's first example
-    const firstTs = Object.values(data.speakers as Record<string, SpeakerInfo>)[0]?.examples[0]?.timestamp ?? 0;
-    setYtTimestamp(Math.floor(firstTs));
+    applyFileData(data);
+    // Start prefetching the next one in the background
+    prefetchNext(data.id, d);
   }
 
   useEffect(() => {
@@ -147,6 +193,9 @@ function LabelingUI() {
     if (!skipped.includes(fileData.id)) skipped.push(fileData.id);
     const expires = new Date(Date.now() + 60 * 60 * 1000).toUTCString();
     document.cookie = `skipped_files=${encodeURIComponent(JSON.stringify(skipped))}; expires=${expires}; path=/`;
+    // Reset prefetch — skipped cookies change the order
+    prefetchRef.current = null;
+    setPrefetched(false);
     loadNext();
   }
 
@@ -218,6 +267,9 @@ function LabelingUI() {
               onClick={() => {
                 const next = direction === "desc" ? "asc" : "desc";
                 setDirection(next);
+                // Reset prefetch — direction change invalidates it
+                prefetchRef.current = null;
+                setPrefetched(false);
                 loadNext(next);
               }}
               className="rounded border border-gray-700 px-2 py-1 text-xs text-gray-400 hover:border-gray-500 hover:text-gray-200"
@@ -228,6 +280,11 @@ function LabelingUI() {
             <span className="rounded bg-gray-800 px-2 py-1 text-xs text-gray-400">
               {fileData.id}
             </span>
+            {prefetched && (
+              <span className="rounded bg-green-900/50 px-2 py-1 text-xs text-green-400" title="Następny odcinek gotowy">
+                ✓ next
+              </span>
+            )}
           </div>
         </div>
 

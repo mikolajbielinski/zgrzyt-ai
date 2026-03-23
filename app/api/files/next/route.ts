@@ -67,8 +67,13 @@ export async function GET(request: NextRequest) {
     const skippedRaw = request.cookies.get("skipped_files")?.value;
     const skipped: string[] = skippedRaw ? JSON.parse(skippedRaw) : [];
 
+    // Allow excluding specific IDs (comma-separated) for prefetching
+    const excludeParam = request.nextUrl.searchParams.get("exclude") ?? "";
+    const excludeIds = excludeParam ? excludeParam.split(",") : [];
+
     for (const id of files) {
       if (skipped.includes(id)) continue;
+      if (excludeIds.includes(id)) continue;
       const data = (await getTranscriptFile(id)) as Utterance[];
       const speakers = extractSpeakers(data);
       if (speakers) {
