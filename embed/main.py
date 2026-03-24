@@ -19,24 +19,44 @@ from qdrant_client.models import (
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
-S3_BUCKET = os.environ["S3_BUCKET"]
-S3_PREFIX = os.environ.get("S3_PREFIX", "transcripts/")
-TRANSCRIPTS_DIR = os.environ.get("TRANSCRIPTS_DIR", "/transcripts")
-QDRANT_URL = os.environ.get(
-    "QDRANT_URL", "http://qdrant.zgrzyt-ai.svc.cluster.local:6333"
-)
-COLLECTION_NAME = os.environ.get("COLLECTION_NAME", "zgrzyt-transcripts")
-CHUNK_MAX_TOKENS = int(os.environ.get("CHUNK_MAX_TOKENS", "500"))
-EMBEDDING_MODEL = "text-embedding-3-large"
-VECTOR_SIZE = 3072
-EMBED_BATCH_SIZE = 100
+REQUIRED_ENV_VARS = [
+    "S3_BUCKET",
+    "S3_PREFIX",
+    "TRANSCRIPTS_DIR",
+    "QDRANT_URL",
+    "COLLECTION_NAME",
+    "CHUNK_MAX_TOKENS",
+    "EMBEDDING_MODEL",
+    "VECTOR_SIZE",
+    "EMBED_BATCH_SIZE",
+    "OPENAI_API_KEY",
+]
 
 
-def sync_transcripts_from_s3():
-    source = f"s3://{S3_BUCKET}/{S3_PREFIX}"
-    log.info("Syncing %s -> %s", source, TRANSCRIPTS_DIR)
+def load_config():
+    missing = [var for var in REQUIRED_ENV_VARS if var not in os.environ]
+    if missing:
+        log.error("Missing required environment variables: %s", ", ".join(missing))
+        raise SystemExit(1)
+
+    return {
+        "s3_bucket": os.environ["S3_BUCKET"],
+        "s3_prefix": os.environ["S3_PREFIX"],
+        "transcripts_dir": os.environ["TRANSCRIPTS_DIR"],
+        "qdrant_url": os.environ["QDRANT_URL"],
+        "collection_name": os.environ["COLLECTION_NAME"],
+        "chunk_max_tokens": int(os.environ["CHUNK_MAX_TOKENS"]),
+        "embedding_model": os.environ["EMBEDDING_MODEL"],
+        "vector_size": int(os.environ["VECTOR_SIZE"]),
+        "embed_batch_size": int(os.environ["EMBED_BATCH_SIZE"]),
+    }
+
+
+def sync_transcripts_from_s3(cfg):
+    source = f"s3://{cfg['s3_bucket']}/{cfg['s3_prefix']}"
+    log.info("Syncing %s -> %s", source, cfg["transcripts_dir"])
     result = subprocess.run(
-        ["aws", "s3", "sync", source, TRANSCRIPTS_DIR],
+        ["aws", "s3", "sync", source, cfg["transcripts_dir"]],
         capture_output=True,
         text=True,
     )
@@ -48,18 +68,18 @@ def sync_transcripts_from_s3():
         log.info("S3 sync: already up to date")
 
 
-def list_local_transcripts():
+def list_local_transcripts(cfg):
     ids = []
-    for filename in os.listdir(TRANSCRIPTS_DIR):
+    for filename in os.listdir(cfg["transcripts_dir"]):
         if filename.endswith(".json"):
             youtube_id = filename.removesuffix(".json")
             ids.append(youtube_id)
     return ids
 
 
-def is_processed(qdrant, youtube_id):
+def is_processed(qdrant, cfg, youtube_id):
     result = qdrant.count(
-        collection_name=COLLECTION_NAME,
+        collection_name=cfg["collection_name"],
         count_filter=Filter(
             must=[
                 FieldCondition(key="youtube_id", match=MatchValue(value=youtube_id))
@@ -69,14 +89,13 @@ def is_processed(qdrant, youtube_id):
     return result.count > 0
 
 
-def load_transcript(youtube_id):
-    path = os.path.join(TRANSCRIPTS_DIR, f"{youtube_id}.json")
+def load_transcript(cfg, youtube_id):
+    path = os.path.join(cfg["transcripts_dir"], f"{youtube_id}.json")
     with open(path) as f:
         return json.load(f)
 
 
 def chunk_transcript(segments, youtube_id, max_tokens, tokenizer):
-    # Merge consecutive same-speaker segments into utterances
     utterances = []
     current = None
     for seg in segments:
@@ -99,7 +118,6 @@ def chunk_transcript(segments, youtube_id, max_tokens, tokenizer):
     if current:
         utterances.append(current)
 
-    # Build chunks from utterances
     chunks = []
     chunk_utterances = []
     chunk_tokens = 0
@@ -110,7 +128,6 @@ def chunk_transcript(segments, youtube_id, max_tokens, tokenizer):
 
         if chunk_tokens + utt_tokens > max_tokens and chunk_utterances:
             chunks.append(_build_chunk(chunk_utterances, youtube_id, len(chunks)))
-            # Overlap: keep last utterance for context
             last = chunk_utterances[-1]
             chunk_utterances = [last]
             chunk_tokens = last["tokens"]
@@ -140,26 +157,30 @@ def _build_chunk(utterances, youtube_id, index):
     }
 
 
-def embed_texts(openai_client, texts):
+def embed_texts(openai_client, cfg, texts):
     all_embeddings = []
-    for i in range(0, len(texts), EMBED_BATCH_SIZE):
-        batch = texts[i : i + EMBED_BATCH_SIZE]
-        response = openai_client.embeddings.create(model=EMBEDDING_MODEL, input=batch)
+    for i in range(0, len(texts), cfg["embed_batch_size"]):
+        batch = texts[i : i + cfg["embed_batch_size"]]
+        response = openai_client.embeddings.create(
+            model=cfg["embedding_model"], input=batch
+        )
         all_embeddings.extend([d.embedding for d in response.data])
     return all_embeddings
 
 
-def ensure_collection(qdrant):
+def ensure_collection(qdrant, cfg):
     collections = [c.name for c in qdrant.get_collections().collections]
-    if COLLECTION_NAME not in collections:
+    if cfg["collection_name"] not in collections:
         qdrant.create_collection(
-            collection_name=COLLECTION_NAME,
-            vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
+            collection_name=cfg["collection_name"],
+            vectors_config=VectorParams(
+                size=cfg["vector_size"], distance=Distance.COSINE
+            ),
         )
-        log.info("Created collection '%s'", COLLECTION_NAME)
+        log.info("Created collection '%s'", cfg["collection_name"])
 
 
-def store_chunks(qdrant, chunks, embeddings):
+def store_chunks(qdrant, cfg, chunks, embeddings):
     points = []
     for chunk, embedding in zip(chunks, embeddings):
         point_id = str(
@@ -183,35 +204,39 @@ def store_chunks(qdrant, chunks, embeddings):
         )
 
     for i in range(0, len(points), 100):
-        qdrant.upsert(collection_name=COLLECTION_NAME, points=points[i : i + 100])
+        qdrant.upsert(collection_name=cfg["collection_name"], points=points[i : i + 100])
 
 
 def main():
-    sync_transcripts_from_s3()
+    cfg = load_config()
 
-    qdrant = QdrantClient(url=QDRANT_URL)
+    sync_transcripts_from_s3(cfg)
+
+    qdrant = QdrantClient(url=cfg["qdrant_url"])
     openai_client = OpenAI()
-    tokenizer = tiktoken.encoding_for_model(EMBEDDING_MODEL)
+    tokenizer = tiktoken.encoding_for_model(cfg["embedding_model"])
 
-    ensure_collection(qdrant)
+    ensure_collection(qdrant, cfg)
 
-    transcript_ids = list_local_transcripts()
+    transcript_ids = list_local_transcripts(cfg)
     log.info("Found %d transcripts locally", len(transcript_ids))
 
-    new_ids = [tid for tid in transcript_ids if not is_processed(qdrant, tid)]
+    new_ids = [tid for tid in transcript_ids if not is_processed(qdrant, cfg, tid)]
     log.info("New transcripts to process: %d", len(new_ids))
 
     for i, youtube_id in enumerate(new_ids, 1):
         log.info("[%d/%d] Processing %s", i, len(new_ids), youtube_id)
 
-        segments = load_transcript(youtube_id)
-        chunks = chunk_transcript(segments, youtube_id, CHUNK_MAX_TOKENS, tokenizer)
+        segments = load_transcript(cfg, youtube_id)
+        chunks = chunk_transcript(
+            segments, youtube_id, cfg["chunk_max_tokens"], tokenizer
+        )
         log.info("  %d chunks", len(chunks))
 
         texts = [c["text"] for c in chunks]
-        embeddings = embed_texts(openai_client, texts)
+        embeddings = embed_texts(openai_client, cfg, texts)
 
-        store_chunks(qdrant, chunks, embeddings)
+        store_chunks(qdrant, cfg, chunks, embeddings)
         log.info("  Stored in Qdrant")
 
     log.info("Done!")
