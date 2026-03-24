@@ -1,4 +1,4 @@
-name: Build and push Docker image
+name: Build and push Docker images
 
 on:
   push:
@@ -12,12 +12,16 @@ permissions:
   contents: read
   packages: write
 
-env:
-  IMAGE_NAME: ghcr.io/mikolajbielinski/zgrzyt
-
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - context: download
+            image: ghcr.io/mikolajbielinski/zgrzyt-download
+          - context: embed
+            image: ghcr.io/mikolajbielinski/zgrzyt-embed
 
     steps:
       - name: Checkout repo
@@ -37,7 +41,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE_NAME }}
+          images: ${{ matrix.image }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=sha-,enable={{is_default_branch}}
@@ -46,7 +50,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ${{ matrix.context }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
