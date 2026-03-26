@@ -22,6 +22,10 @@ jobs:
             image: ghcr.io/mikolajbielinski/zgrzyt-download
           - context: embed
             image: ghcr.io/mikolajbielinski/zgrzyt-embed
+          - context: backend
+            image: ghcr.io/mikolajbielinski/zgrzyt-backend
+          - context: frontend
+            image: ghcr.io/mikolajbielinski/zgrzyt-frontend
 
     steps:
       - name: Checkout repo
