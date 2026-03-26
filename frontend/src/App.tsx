@@ -4,7 +4,7 @@ import ChatWindow from "./components/ChatWindow.tsx";
 import InputArea from "./components/InputArea.tsx";
 import type { Message } from "./types/index.ts";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+const API_URL = "/api";
 const STORAGE_KEY = "zgrzyt-chat-history";
 
 function loadMessages(): Message[] {
