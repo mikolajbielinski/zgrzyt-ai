@@ -26,6 +26,7 @@ jobs:
             image: ghcr.io/mikolajbielinski/zgrzyt-backend
           - context: frontend
             image: ghcr.io/mikolajbielinski/zgrzyt-frontend
+            build-args: VITE_API_URL=/api
 
     steps:
       - name: Checkout repo
@@ -58,3 +59,4 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: ${{ matrix.build-args }}
