@@ -1,3 +1,4 @@
+import Markdown from "react-markdown";
 import type { Message as MessageType } from "../types/index.ts";
 
 interface MessageProps {
@@ -25,7 +26,43 @@ export default function Message({ message }: MessageProps) {
             : "bg-bg-light text-text-muted rounded-tl-none"
         }`}
       >
-        {message.content}
+        {isUser ? (
+          message.content
+        ) : (
+          <Markdown
+            components={{
+              a: ({ href, children }) => (
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-accent hover:text-accent-hover underline"
+                >
+                  {children}
+                </a>
+              ),
+              p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+              strong: ({ children }) => (
+                <strong className="font-semibold text-text">{children}</strong>
+              ),
+              blockquote: ({ children }) => (
+                <blockquote className="border-l-2 border-accent/50 pl-3 my-2 italic">
+                  {children}
+                </blockquote>
+              ),
+              ul: ({ children }) => (
+                <ul className="list-disc pl-4 mb-2">{children}</ul>
+              ),
+              ol: ({ children }) => (
+                <ol className="list-decimal pl-4 mb-2">{children}</ol>
+              ),
+              li: ({ children }) => <li className="mb-1">{children}</li>,
+              hr: () => <hr className="border-border my-3" />,
+            }}
+          >
+            {message.content}
+          </Markdown>
+        )}
       </div>
     </div>
   );
