@@ -44,7 +44,7 @@ export default function InputArea({ onSend, disabled }: InputAreaProps) {
   );
 
   return (
-    <div className="fixed bottom-0 right-0 left-0 bg-[#0A0A0A]/80 backdrop-blur-md p-6 z-40">
+    <div className="fixed bottom-[-2px] right-0 left-0 backdrop-blur-md p-6 z-40">
       <div className="max-w-[800px] mx-auto flex items-center gap-3">
         <div className="flex-1 relative group">
           <textarea

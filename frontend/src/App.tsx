@@ -11,6 +11,32 @@ const SUGGESTION_PROMPTS = [
   "Ile Revo wyciska na klatę?",
 ];
 
+// TODO: Remove test messages
+const TEST_MESSAGES: Message[] = [
+  {
+    role: "user",
+    content: "Co Gimper sądzi o dramie na polskim YT?",
+  },
+  {
+    role: "bot",
+    content: `W odcinku #154 Gimper szczegółowo omawia mechanizmy obecnych konfliktów w polskim internecie. Podkreśla, że większość "dram" jest teraz projektowana pod algorytmy krótkich treści typu Shorts i TikTok.
+
+> "Nie chodzi już o prawdę, chodzi o to, jak szybko jesteś w stanie wyprodukować 15-sekundowy klip, który zmiecie konkurencję w zasięgach..." — Gimper, ZGRZYT #154 - DRAMA ALERT, 12:34`,
+  },
+  {
+    role: "user",
+    content: "A co na to odpowiedział Revo? Czy się z tym zgadza?",
+  },
+  {
+    role: "bot",
+    content: `Revo częściowo się zgadza z Gimperem, ale dodaje od siebie ważny wątek — że to nie tylko wina algorytmów, ale też samej publiczności, która premiuje konflikty kliknięciami.
+
+> "My jako widzowie jesteśmy współodpowiedzialni. Każde kliknięcie w beef to głos za kolejnym" — Revo, ZGRZYT #154 - DRAMA ALERT, 18:47
+
+Revo podkreśla też, że jedynym wyjściem jest **świadome wspieranie merytorycznych twórców** zamiast reagowania na drama-bait.`,
+  },
+];
+
 function loadMessages(): Message[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -32,7 +58,10 @@ function toApiMessages(messages: Message[]) {
 }
 
 export default function App() {
-  const [messages, setMessages] = useState<Message[]>(loadMessages);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    const saved = loadMessages();
+    return saved.length > 0 ? saved : TEST_MESSAGES;
+  });
   const [isTyping, setIsTyping] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
@@ -144,7 +173,7 @@ export default function App() {
       )}
 
       {/* Main Content */}
-      <main className="h-screen pt-28 pb-32 overflow-y-auto relative">
+      <main className="h-screen pt-28 pb-32 overflow-y-auto relative" style={{ backgroundImage: 'radial-gradient(circle at 0% 0%, rgba(123, 47, 254, 0.08) 0%, transparent 40%), radial-gradient(circle at 100% 100%, rgba(123, 47, 254, 0.08) 0%, transparent 40%), radial-gradient(circle at 50% 50%, rgba(123, 47, 254, 0.03) 0%, transparent 60%)', backgroundAttachment: 'fixed' }}>
         <div className="max-w-[800px] mx-auto px-6 py-8 flex flex-col gap-12">
           {isEmpty ? (
             <div className="flex flex-col items-center text-center py-12 space-y-6">
