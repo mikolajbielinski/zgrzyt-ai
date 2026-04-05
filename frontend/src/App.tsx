@@ -60,8 +60,8 @@ export default function App() {
         throw new Error(`HTTP ${res.status}`);
       }
 
-      const data: { answer: string } = await res.json();
-      const botMsg: Message = { role: "bot", content: data.answer };
+      const data: { answer: string; sources?: { youtube_url: string; timestamp: string; text: string }[] } = await res.json();
+      const botMsg: Message = { role: "bot", content: data.answer, sources: data.sources };
 
       setMessages((prev) => {
         const next = [...prev, botMsg];

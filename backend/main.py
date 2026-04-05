@@ -93,8 +93,15 @@ class AskRequest(BaseModel):
     messages: list[ChatMessage]
 
 
+class Source(BaseModel):
+    youtube_url: str
+    timestamp: str
+    text: str
+
+
 class AskResponse(BaseModel):
     answer: str
+    sources: list[Source]
 
 
 def ensure_text_index():
@@ -131,7 +138,7 @@ def expand_query(user_query: str) -> dict:
         return {"queries": [], "keywords": []}
 
 
-def search_qdrant(query: str) -> str:
+def search_qdrant(query: str) -> tuple[str, list[Source]]:
     expanded = expand_query(query)
     all_queries = [query] + expanded.get("queries", [])
     keywords = expanded.get("keywords", [])
@@ -177,19 +184,26 @@ def search_qdrant(query: str) -> str:
     log.info("Found %d unique chunks", len(results))
 
     if not results:
-        return "Brak wyników w bazie wiedzy."
+        return "Brak wyników w bazie wiedzy.", []
 
     chunks = []
+    sources = []
     for point in results:
         payload = point.payload
         start_seconds = int(payload["start"])
         youtube_url = f"https://youtube.com/watch?v={payload['youtube_id']}&t={start_seconds}s"
         minutes = int(payload["start"] // 60)
         seconds = int(payload["start"] % 60)
-        header = f"[Odcinek: {youtube_url} | Czas: {minutes}:{seconds:02d}]"
+        timestamp = f"{minutes}:{seconds:02d}"
+        header = f"[Odcinek: {youtube_url} | Czas: {timestamp}]"
         chunks.append(f"{header}\n{payload['text']}")
+        sources.append(Source(
+            youtube_url=youtube_url,
+            timestamp=timestamp,
+            text=payload["text"][:200],
+        ))
 
-    return "\n\n---\n\n".join(chunks)
+    return "\n\n---\n\n".join(chunks), sources
 
 
 @app.post("/ask", response_model=AskResponse)
@@ -203,7 +217,7 @@ async def ask(req: AskRequest) -> AskResponse:
     if not last_user_message:
         raise HTTPException(status_code=400, detail="Brak wiadomości od użytkownika")
 
-    context = search_qdrant(last_user_message)
+    context, sources = search_qdrant(last_user_message)
 
     try:
         response = openai_client.chat.completions.create(
@@ -218,7 +232,7 @@ async def ask(req: AskRequest) -> AskResponse:
         raise HTTPException(status_code=502, detail=f"Błąd OpenAI: {e}")
 
     answer = response.choices[0].message.content or ""
-    return AskResponse(answer=answer)
+    return AskResponse(answer=answer, sources=sources)
 
 
 ensure_text_index()

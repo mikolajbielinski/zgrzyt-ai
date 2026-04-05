@@ -6,69 +6,6 @@ interface MessageProps {
   message: MessageType;
 }
 
-interface ParsedQuote {
-  quote: string;
-  speaker?: string;
-  source?: string;
-  timestamp?: string;
-}
-
-function parseContent(content: string): {
-  text: string;
-  quotes: ParsedQuote[];
-} {
-  const lines = content.split("\n");
-  const textLines: string[] = [];
-  const quotes: ParsedQuote[] = [];
-
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i];
-    if (line.startsWith(">")) {
-      const quoteLines: string[] = [];
-      while (i < lines.length && lines[i].startsWith(">")) {
-        quoteLines.push(lines[i].replace(/^>\s?/, ""));
-        i++;
-      }
-      const raw = quoteLines.join(" ").trim();
-
-      const match = raw.match(
-        /^["„"](.+?)[""\u201D]\s*[—–-]\s*(.+)$/s
-      );
-      if (match) {
-        const quoteText = match[1].trim();
-        const meta = match[2].trim();
-        const parts = meta.split(",").map((s) => s.trim());
-
-        const speaker = parts[0] || undefined;
-        const source =
-          parts.length > 2 ? parts.slice(1, -1).join(", ") : parts[1];
-        const timestampCandidate = parts[parts.length - 1];
-        const timestamp = /^\d+:\d{2}$/.test(timestampCandidate ?? "")
-          ? timestampCandidate
-          : undefined;
-        const actualSource = timestamp
-          ? source
-          : parts.slice(1).join(", ") || undefined;
-
-        quotes.push({
-          quote: `"${quoteText}"`,
-          speaker,
-          source: actualSource ? `ŹRÓDŁO: ${actualSource}` : undefined,
-          timestamp,
-        });
-      } else {
-        quotes.push({ quote: raw });
-      }
-    } else {
-      textLines.push(line);
-      i++;
-    }
-  }
-
-  return { text: textLines.join("\n").trim(), quotes };
-}
-
 export default function Message({ message }: MessageProps) {
   const isUser = message.role === "user";
 
@@ -80,16 +17,11 @@ export default function Message({ message }: MessageProps) {
     );
   }
 
-  const { text, quotes } = parseContent(message.content);
-  const hasQuotes = quotes.length > 0;
+  const sources = message.sources ?? [];
 
   return (
-    <div
-      className={`self-start max-w-[95%] md:max-w-[85%] animate-fade-in-up bg-[#111111]/80 backdrop-blur-sm border-l-4 border-accent shadow-xl overflow-hidden ${
-        hasQuotes ? "rounded-r-xl rounded-bl-xl" : "rounded-r-xl rounded-bl-xl"
-      }`}
-    >
-      {text && (
+    <div className="self-start max-w-[95%] md:max-w-[85%] animate-fade-in-up bg-[#111111]/80 backdrop-blur-sm border-l-4 border-accent shadow-xl overflow-hidden rounded-r-xl rounded-bl-xl">
+      {message.content && (
         <div className="p-5 text-white leading-relaxed text-sm">
           <Markdown
             components={{
@@ -119,15 +51,20 @@ export default function Message({ message }: MessageProps) {
               hr: () => <hr className="border-border my-3" />,
             }}
           >
-            {text}
+            {message.content}
           </Markdown>
         </div>
       )}
-      {quotes.map((q, i) => (
-        <div key={i} className="px-4 pb-4 first:pt-4">
-          <SourceCard {...q} />
+      {sources.length > 0 && (
+        <div className="px-4 pb-4 flex flex-col gap-2">
+          <span className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant px-1">
+            Źródła
+          </span>
+          {sources.map((s, i) => (
+            <SourceCard key={i} {...s} />
+          ))}
         </div>
-      ))}
+      )}
     </div>
   );
 }
