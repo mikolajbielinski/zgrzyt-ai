@@ -1,11 +1,15 @@
 import { useState, useCallback } from "react";
-import { RotateCcw } from "lucide-react";
 import ChatWindow from "./components/ChatWindow.tsx";
 import InputArea from "./components/InputArea.tsx";
 import type { Message } from "./types/index.ts";
 
 const API_URL = "/api";
 const STORAGE_KEY = "zgrzyt-chat-history";
+
+const SUGGESTION_PROMPTS = [
+  "Czym jest efekt spadochroniarza?",
+  "Ile Revo wyciska na klatę?",
+];
 
 function loadMessages(): Message[] {
   try {
@@ -22,7 +26,7 @@ function saveMessages(messages: Message[]) {
 
 function toApiMessages(messages: Message[]) {
   return messages.map((m) => ({
-    role: m.role === "bot" ? "assistant" as const : "user" as const,
+    role: m.role === "bot" ? ("assistant" as const) : ("user" as const),
     content: m.content,
   }));
 }
@@ -84,46 +88,53 @@ export default function App() {
     setShowResetConfirm(false);
   }, []);
 
-  return (
-    <div className="flex flex-col h-dvh">
-      {/* Header */}
-      <header className="shrink-0 pt-8 pb-4 px-4 text-center relative">
-        <h1 className="text-4xl md:text-5xl font-black tracking-tight uppercase">
-          ZGRZYT
-          <span className="text-accent text-lg md:text-xl font-semibold tracking-normal normal-case ml-3">
-            AI Chat
-          </span>
-        </h1>
-        <p className="text-text-dim text-sm mt-1">
-          Zapytaj o cokolwiek z podcastu ZGRZYT
-        </p>
+  const isEmpty = messages.length === 0 && !isTyping;
 
-        {messages.length > 0 && (
+  return (
+    <div className="flex flex-col h-dvh overflow-hidden">
+      {/* Glass Navigation */}
+      <header className="fixed top-0 right-0 left-0 z-40 glass-nav">
+        <div className="flex justify-between items-center w-full px-8 py-5 max-w-[1200px] mx-auto">
+          <div className="flex items-center gap-0">
+            <span className="text-2xl font-black tracking-tighter text-white uppercase font-sans logo-white-glow">
+              ZGRZYT
+            </span>
+            <span className="text-2xl font-black tracking-tighter text-[#7B2FFE] uppercase font-sans logo-purple-glow">
+              OPEDIA
+            </span>
+          </div>
           <button
             onClick={() => setShowResetConfirm(true)}
-            className="absolute top-8 right-4 p-2 text-text-dim hover:text-accent transition-colors cursor-pointer"
-            title="Resetuj chat"
+            className="group flex items-center gap-3 px-5 py-2.5 bg-black/40 border border-[#7B2FFE]/30 rounded-xl hover:border-[#7B2FFE] hover:bg-[#7B2FFE]/5 transition-all active:scale-95 duration-200 relative overflow-hidden cursor-pointer"
           >
-            <RotateCcw size={18} />
+            <div className="absolute inset-0 bg-[#7B2FFE]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <span className="material-symbols-outlined text-lg text-[#7B2FFE]">
+              refresh
+            </span>
+            <span className="text-xs font-bold tracking-[0.2em] uppercase text-white/90 hidden sm:inline">
+              Resetuj Sesję
+            </span>
           </button>
-        )}
+        </div>
       </header>
 
-      {/* Reset confirmation */}
+      {/* Reset Confirmation Modal */}
       {showResetConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-bg-lighter border border-border rounded-lg p-6 max-w-sm mx-4 text-center">
-            <p className="text-text mb-4">Na pewno chcesz zresetować chat?</p>
-            <div className="flex gap-3 justify-center">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-6 transition-opacity duration-300">
+          <div className="bg-surface-container p-8 rounded-2xl max-w-sm w-full border border-white/5 space-y-6">
+            <h3 className="text-xl font-black uppercase tracking-tighter text-white">
+              Na pewno chcesz zresetować czat?
+            </h3>
+            <div className="flex gap-4">
               <button
                 onClick={() => setShowResetConfirm(false)}
-                className="px-4 py-2 text-sm rounded-lg border border-border text-text-muted hover:text-text transition-colors cursor-pointer"
+                className="flex-1 py-3 text-xs font-black uppercase tracking-widest text-on-surface-variant border border-white/10 rounded-lg hover:bg-white/5 transition-all cursor-pointer"
               >
                 Anuluj
               </button>
               <button
                 onClick={handleReset}
-                className="px-4 py-2 text-sm rounded-lg bg-accent text-white hover:bg-accent-hover transition-colors cursor-pointer"
+                className="flex-1 py-3 text-xs font-black uppercase tracking-widest text-on-primary bg-accent rounded-lg neon-glow transition-all cursor-pointer"
               >
                 Resetuj
               </button>
@@ -132,25 +143,48 @@ export default function App() {
         </div>
       )}
 
-      {/* Chat area */}
-      {messages.length === 0 && !isTyping ? (
-        <div className="flex-1 flex items-center justify-center px-4">
-          <div className="text-center max-w-md">
-            <div className="text-6xl mb-4">🎙️</div>
-            <p className="text-text-muted text-sm">
-              Zadaj pytanie o podcast ZGRZYT prowadzony przez Gimpera i Revo.
-              <br />
-              <span className="text-text-dim">
-                Odcinki, tematy, cytaty — pytaj o co chcesz.
-              </span>
-            </p>
-          </div>
+      {/* Main Content */}
+      <main className="h-screen pt-28 pb-32 overflow-y-auto relative">
+        <div className="max-w-[800px] mx-auto px-6 py-8 flex flex-col gap-12">
+          {isEmpty ? (
+            <div className="flex flex-col items-center text-center py-12 space-y-6">
+              <div className="w-20 h-20 bg-surface-container-highest/50 rounded-3xl flex items-center justify-center neon-glow relative overflow-hidden group">
+                <div className="absolute inset-0 bg-gradient-to-tr from-accent/20 to-transparent" />
+                <span
+                  className="material-symbols-outlined text-5xl text-accent relative z-10"
+                  style={{ fontVariationSettings: "'FILL' 1" }}
+                >
+                  bolt
+                </span>
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-3xl font-black tracking-tighter uppercase text-white">
+                  Zapytaj o cokolwiek z podcastu ZGRZYT
+                </h2>
+                <p className="text-on-surface-variant font-medium">
+                  Znam treść wszystkich odcinków Gimpera i Revo
+                </p>
+              </div>
+              <div className="flex flex-wrap justify-center gap-3 mt-8">
+                {SUGGESTION_PROMPTS.map((prompt) => (
+                  <button
+                    key={prompt}
+                    onClick={() => handleSend(prompt)}
+                    disabled={isTyping}
+                    className="px-4 py-2 bg-surface-container-highest/40 rounded-lg text-sm text-on-surface-variant hover:text-white hover:bg-surface-container-highest border border-transparent hover:border-accent/50 transition-all duration-300 backdrop-blur-sm cursor-pointer disabled:opacity-50"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <ChatWindow messages={messages} isTyping={isTyping} />
+          )}
         </div>
-      ) : (
-        <ChatWindow messages={messages} isTyping={isTyping} />
-      )}
+      </main>
 
-      {/* Input */}
+      {/* Bottom Input Bar */}
       <InputArea onSend={handleSend} disabled={isTyping} />
     </div>
   );

@@ -8,61 +8,52 @@ interface MessageProps {
 export default function Message({ message }: MessageProps) {
   const isUser = message.role === "user";
 
+  if (isUser) {
+    return (
+      <div className="bg-surface-container-high/80 backdrop-blur-sm p-5 rounded-l-xl rounded-br-xl self-end max-w-[80%] text-white text-sm shadow-lg animate-fade-in-up">
+        {message.content}
+      </div>
+    );
+  }
+
   return (
-    <div
-      className={`flex items-start gap-3 animate-fade-in-up ${
-        isUser ? "flex-row-reverse" : ""
-      }`}
-    >
-      {!isUser && (
-        <div className="shrink-0 w-8 h-8 rounded-md bg-accent/20 flex items-center justify-center text-sm font-bold text-accent">
-          Z
-        </div>
-      )}
-      <div
-        className={`max-w-[80%] rounded-lg px-4 py-3 text-sm leading-relaxed ${
-          isUser
-            ? "bg-bg-lighter text-text rounded-tr-none"
-            : "bg-bg-light text-text-muted rounded-tl-none"
-        }`}
-      >
-        {isUser ? (
-          message.content
-        ) : (
-          <Markdown
-            components={{
-              a: ({ href, children }) => (
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-accent hover:text-accent-hover underline"
-                >
+    <div className="flex flex-col gap-4 self-start max-w-[85%] animate-fade-in-up">
+      <div className="bg-[#111111]/80 backdrop-blur-sm p-5 rounded-r-xl rounded-bl-xl border-l-4 border-accent text-white leading-relaxed text-sm shadow-xl">
+        <Markdown
+          components={{
+            a: ({ href, children }) => (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-accent hover:text-accent-hover underline"
+              >
+                {children}
+              </a>
+            ),
+            p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+            strong: ({ children }) => (
+              <strong className="font-semibold text-white">{children}</strong>
+            ),
+            blockquote: ({ children }) => (
+              <blockquote className="border-l-2 border-accent/40 pl-4 py-1 my-2">
+                <div className="text-on-surface-variant italic text-xs leading-normal">
                   {children}
-                </a>
-              ),
-              p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-              strong: ({ children }) => (
-                <strong className="font-semibold text-text">{children}</strong>
-              ),
-              blockquote: ({ children }) => (
-                <blockquote className="border-l-2 border-accent/50 pl-3 my-2 italic">
-                  {children}
-                </blockquote>
-              ),
-              ul: ({ children }) => (
-                <ul className="list-disc pl-4 mb-2">{children}</ul>
-              ),
-              ol: ({ children }) => (
-                <ol className="list-decimal pl-4 mb-2">{children}</ol>
-              ),
-              li: ({ children }) => <li className="mb-1">{children}</li>,
-              hr: () => <hr className="border-border my-3" />,
-            }}
-          >
-            {message.content}
-          </Markdown>
-        )}
+                </div>
+              </blockquote>
+            ),
+            ul: ({ children }) => (
+              <ul className="list-disc pl-4 mb-2">{children}</ul>
+            ),
+            ol: ({ children }) => (
+              <ol className="list-decimal pl-4 mb-2">{children}</ol>
+            ),
+            li: ({ children }) => <li className="mb-1">{children}</li>,
+            hr: () => <hr className="border-border my-3" />,
+          }}
+        >
+          {message.content}
+        </Markdown>
       </div>
     </div>
   );

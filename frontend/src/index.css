@@ -13,6 +13,15 @@
   --color-accent: #7B2FFE;
   --color-accent-hover: #9B5FFF;
   --color-accent-glow: rgba(123, 47, 254, 0.3);
+  --color-surface: #0A0A0A;
+  --color-surface-container: #1a1919;
+  --color-surface-container-high: #201f1f;
+  --color-surface-container-highest: #262626;
+  --color-surface-container-low: #131313;
+  --color-primary: #bb9eff;
+  --color-primary-dim: #884cff;
+  --color-on-surface-variant: #adaaaa;
+  --color-on-primary: #3b008b;
 }
 
 * {
@@ -26,6 +35,15 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-image:
+    radial-gradient(circle at 0% 0%, rgba(123, 47, 254, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 100% 100%, rgba(123, 47, 254, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(123, 47, 254, 0.03) 0%, transparent 60%);
+  background-attachment: fixed;
+}
+
+.material-symbols-outlined {
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
 }
 
 /* Noise texture overlay */
@@ -35,7 +53,7 @@ body::before {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.03;
+  opacity: 0.02;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-repeat: repeat;
   background-size: 256px 256px;
@@ -59,12 +77,45 @@ body::before {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #333;
-  border-radius: 3px;
+  background: #7B2FFE;
+  border-radius: 10px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #555;
+/* Glass navigation */
+.glass-nav {
+  background: rgba(10, 10, 10, 0.8);
+  backdrop-filter: blur(20px);
+  border-bottom: 0.5px solid rgba(123, 47, 254, 0.5);
+}
+
+/* Neon glow effect */
+.neon-glow {
+  box-shadow: 0 0 20px rgba(123, 47, 254, 0.3);
+}
+
+/* Logo text effects */
+.logo-white-glow {
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}
+
+.logo-purple-glow {
+  text-shadow: 0 0 12px rgba(123, 47, 254, 0.8), 0 0 20px rgba(123, 47, 254, 0.4);
+}
+
+/* Input underline animation */
+.input-underline {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(to right, transparent, rgba(123, 47, 254, 0.5), transparent);
+  transform: scaleX(0);
+  transition: transform 0.5s;
+}
+
+.group:focus-within .input-underline {
+  transform: scaleX(1);
 }
 
 /* Fade-in animation for messages */

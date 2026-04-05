@@ -1,5 +1,4 @@
 import { useRef, useCallback } from "react";
-import { Send } from "lucide-react";
 
 interface InputAreaProps {
   onSend: (text: string) => void;
@@ -45,24 +44,32 @@ export default function InputArea({ onSend, disabled }: InputAreaProps) {
   );
 
   return (
-    <div className="sticky bottom-0 bg-gradient-to-t from-bg from-80% to-transparent pt-6 pb-4 px-4">
-      <div className="max-w-3xl mx-auto flex items-end gap-3">
-        <textarea
-          ref={textareaRef}
-          rows={1}
-          placeholder="O czym chcesz pogadać?"
-          disabled={disabled}
-          onInput={handleInput}
-          onKeyDown={handleKeyDown}
-          autoFocus
-          className="flex-1 resize-none bg-bg-input border border-border rounded-lg px-4 py-3 text-sm text-text placeholder:text-text-dim focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/30 transition-colors disabled:opacity-50"
-        />
+    <div className="fixed bottom-0 right-0 left-0 bg-[#0A0A0A]/80 backdrop-blur-md p-6 z-40">
+      <div className="max-w-[800px] mx-auto flex items-center gap-3">
+        <div className="flex-1 relative group">
+          <textarea
+            ref={textareaRef}
+            rows={1}
+            placeholder="O czym chcesz pogadać?"
+            disabled={disabled}
+            onInput={handleInput}
+            onKeyDown={handleKeyDown}
+            autoFocus
+            className="w-full bg-surface-container-high/50 border-none focus:ring-0 focus:outline-none text-white placeholder-on-surface-variant rounded-xl px-5 py-4 resize-none transition-all hover:bg-surface-container-highest/60 disabled:opacity-50"
+          />
+          <div className="input-underline" />
+        </div>
         <button
           onClick={handleSubmit}
           disabled={disabled}
-          className="shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-accent text-white hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          className="shrink-0 w-12 h-12 rounded-full bg-accent flex items-center justify-center text-white neon-glow hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         >
-          <Send size={18} />
+          <span
+            className="material-symbols-outlined text-2xl"
+            style={{ fontVariationSettings: "'FILL' 1" }}
+          >
+            send
+          </span>
         </button>
       </div>
     </div>
