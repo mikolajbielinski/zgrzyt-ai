@@ -1,37 +1,50 @@
 interface SourceCardProps {
-  text: string;
-  timestamp: string;
-  youtube_url: string;
+  quote: string;
+  speaker?: string;
+  source?: string;
+  timestamp?: string;
 }
 
 export default function SourceCard({
-  text,
+  quote,
+  speaker,
+  source,
   timestamp,
-  youtube_url,
 }: SourceCardProps) {
   return (
-    <a
-      href={youtube_url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="block bg-surface-container-low/60 backdrop-blur-sm rounded-xl p-4 flex flex-col gap-3 hover:bg-surface-container-low/80 transition-all duration-200 group cursor-pointer no-underline"
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-accent text-sm">
-            play_circle
-          </span>
-          <span className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
-            Źródło
+    <div className="bg-surface-container-low/60 backdrop-blur-sm rounded-xl p-4 flex flex-col gap-3">
+      {(source || timestamp) && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-accent text-sm">
+              history_edu
+            </span>
+            {source && (
+              <span className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+                {source}
+              </span>
+            )}
+          </div>
+          {timestamp && (
+            <span className="text-accent font-mono text-xs hover:underline transition-all cursor-pointer">
+              {timestamp}
+            </span>
+          )}
+        </div>
+      )}
+      <blockquote className="border-l-2 border-accent/40 pl-4 py-1">
+        <p className="text-on-surface-variant italic text-xs leading-normal">
+          {quote}
+        </p>
+      </blockquote>
+      {speaker && (
+        <div className="flex items-center gap-1.5 self-end">
+          <div className="w-1.5 h-1.5 rounded-full bg-accent" />
+          <span className="text-[9px] font-black uppercase text-accent tracking-widest">
+            {speaker}
           </span>
         </div>
-        <span className="text-accent font-mono text-xs group-hover:underline transition-all">
-          {timestamp}
-        </span>
-      </div>
-      <p className="text-on-surface-variant text-xs leading-relaxed line-clamp-3">
-        {text}
-      </p>
-    </a>
+      )}
+    </div>
   );
 }

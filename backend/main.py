@@ -93,15 +93,8 @@ class AskRequest(BaseModel):
     messages: list[ChatMessage]
 
 
-class Source(BaseModel):
-    youtube_url: str
-    timestamp: str
-    text: str
-
-
 class AskResponse(BaseModel):
     answer: str
-    sources: list[Source]
 
 
 def ensure_text_index():
@@ -138,11 +131,7 @@ def expand_query(user_query: str) -> dict:
         return {"queries": [], "keywords": []}
 
 
-SOURCE_SCORE_THRESHOLD = 0.55
-MAX_SOURCES = 5
-
-
-def search_qdrant(query: str) -> tuple[str, list[Source]]:
+def search_qdrant(query: str) -> str:
     expanded = expand_query(query)
     all_queries = [query] + expanded.get("queries", [])
     keywords = expanded.get("keywords", [])
@@ -151,7 +140,6 @@ def search_qdrant(query: str) -> tuple[str, list[Source]]:
 
     seen_ids = set()
     results = []
-    scores: dict = {}
 
     # Vector search with all queries (batched embedding)
     embeddings_response = openai_client.embeddings.create(
@@ -163,15 +151,11 @@ def search_qdrant(query: str) -> tuple[str, list[Source]]:
             collection_name=cfg["collection_name"],
             query=vector,
             limit=cfg["search_limit"],
-            with_payload=True,
         )
         for point in hits.points:
             if point.id not in seen_ids:
                 seen_ids.add(point.id)
                 results.append(point)
-                scores[point.id] = point.score
-            else:
-                scores[point.id] = max(scores[point.id], point.score)
 
     # Keyword search for exact phrase matching
     for keyword in keywords:
@@ -193,42 +177,19 @@ def search_qdrant(query: str) -> tuple[str, list[Source]]:
     log.info("Found %d unique chunks", len(results))
 
     if not results:
-        return "Brak wyników w bazie wiedzy.", []
+        return "Brak wyników w bazie wiedzy."
 
     chunks = []
-    source_candidates = []
     for point in results:
         payload = point.payload
         start_seconds = int(payload["start"])
         youtube_url = f"https://youtube.com/watch?v={payload['youtube_id']}&t={start_seconds}s"
         minutes = int(payload["start"] // 60)
         seconds = int(payload["start"] % 60)
-        timestamp = f"{minutes}:{seconds:02d}"
-        header = f"[Odcinek: {youtube_url} | Czas: {timestamp}]"
+        header = f"[Odcinek: {youtube_url} | Czas: {minutes}:{seconds:02d}]"
         chunks.append(f"{header}\n{payload['text']}")
 
-        score = scores.get(point.id, 0)
-        if score >= SOURCE_SCORE_THRESHOLD:
-            source_candidates.append((score, payload, youtube_url, timestamp))
-
-    # Deduplicate by video+minute, keep highest score, limit to MAX_SOURCES
-    source_candidates.sort(key=lambda x: x[0], reverse=True)
-    sources = []
-    seen_youtube = set()
-    for score, payload, youtube_url, timestamp in source_candidates:
-        source_key = f"{payload['youtube_id']}_{int(payload['start']) // 60}"
-        if source_key not in seen_youtube:
-            seen_youtube.add(source_key)
-            sources.append(Source(
-                youtube_url=youtube_url,
-                timestamp=timestamp,
-                text=payload["text"][:200],
-            ))
-            if len(sources) >= MAX_SOURCES:
-                break
-
-    log.info("Returning %d sources (threshold=%.2f)", len(sources), SOURCE_SCORE_THRESHOLD)
-    return "\n\n---\n\n".join(chunks), sources
+    return "\n\n---\n\n".join(chunks)
 
 
 @app.post("/ask", response_model=AskResponse)
@@ -242,7 +203,7 @@ async def ask(req: AskRequest) -> AskResponse:
     if not last_user_message:
         raise HTTPException(status_code=400, detail="Brak wiadomości od użytkownika")
 
-    context, sources = search_qdrant(last_user_message)
+    context = search_qdrant(last_user_message)
 
     try:
         response = openai_client.chat.completions.create(
@@ -257,7 +218,7 @@ async def ask(req: AskRequest) -> AskResponse:
         raise HTTPException(status_code=502, detail=f"Błąd OpenAI: {e}")
 
     answer = response.choices[0].message.content or ""
-    return AskResponse(answer=answer, sources=sources)
+    return AskResponse(answer=answer)
 
 
 ensure_text_index()
