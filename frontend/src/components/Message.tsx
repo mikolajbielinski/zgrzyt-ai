@@ -1,12 +1,50 @@
+import { useState, useEffect, useRef } from "react";
 import Markdown from "react-markdown";
 import type { Message as MessageType } from "../types/index.ts";
 import SourceCard from "./SourceCard.tsx";
 
 interface MessageProps {
   message: MessageType;
+  animate?: boolean;
 }
 
-export default function Message({ message }: MessageProps) {
+function useTypewriter(text: string, enabled: boolean) {
+  const [displayed, setDisplayed] = useState(enabled ? "" : text);
+  const [done, setDone] = useState(!enabled);
+  const idx = useRef(0);
+
+  useEffect(() => {
+    if (!enabled) {
+      setDisplayed(text);
+      setDone(true);
+      return;
+    }
+
+    idx.current = 0;
+    setDisplayed("");
+    setDone(false);
+
+    const words = text.split(/(\s+)/);
+    let current = "";
+
+    const interval = setInterval(() => {
+      if (idx.current >= words.length) {
+        clearInterval(interval);
+        setDone(true);
+        return;
+      }
+      current += words[idx.current];
+      idx.current++;
+      setDisplayed(current);
+    }, 30);
+
+    return () => clearInterval(interval);
+  }, [text, enabled]);
+
+  return { displayed, done };
+}
+
+export default function Message({ message, animate = false }: MessageProps) {
   const isUser = message.role === "user";
 
   if (isUser) {
@@ -18,10 +56,11 @@ export default function Message({ message }: MessageProps) {
   }
 
   const sources = message.sources ?? [];
+  const { displayed, done } = useTypewriter(message.content, animate);
 
   return (
     <div className="self-start max-w-[95%] md:max-w-[85%] animate-fade-in-up bg-[#111111]/80 backdrop-blur-sm border-l-4 border-accent shadow-xl overflow-hidden rounded-r-xl rounded-bl-xl">
-      {message.content && (
+      {displayed && (
         <div className="p-5 text-white leading-relaxed text-sm">
           <Markdown
             components={{
@@ -51,12 +90,15 @@ export default function Message({ message }: MessageProps) {
               hr: () => <hr className="border-border my-3" />,
             }}
           >
-            {message.content}
+            {displayed}
           </Markdown>
+          {!done && (
+            <span className="inline-block w-0.5 h-4 bg-accent animate-pulse ml-0.5 align-text-bottom" />
+          )}
         </div>
       )}
-      {sources.length > 0 && (
-        <div className="px-4 pb-4 flex flex-col gap-2">
+      {done && sources.length > 0 && (
+        <div className="px-4 pb-4 flex flex-col gap-2 animate-fade-in-up">
           <span className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant px-1">
             Źródła
           </span>

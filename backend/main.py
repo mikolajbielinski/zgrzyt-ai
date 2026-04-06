@@ -138,6 +138,10 @@ def expand_query(user_query: str) -> dict:
         return {"queries": [], "keywords": []}
 
 
+SOURCE_SCORE_THRESHOLD = 0.55
+MAX_SOURCES = 5
+
+
 def search_qdrant(query: str) -> tuple[str, list[Source]]:
     expanded = expand_query(query)
     all_queries = [query] + expanded.get("queries", [])
@@ -147,6 +151,7 @@ def search_qdrant(query: str) -> tuple[str, list[Source]]:
 
     seen_ids = set()
     results = []
+    scores: dict = {}
 
     # Vector search with all queries (batched embedding)
     embeddings_response = openai_client.embeddings.create(
@@ -158,11 +163,15 @@ def search_qdrant(query: str) -> tuple[str, list[Source]]:
             collection_name=cfg["collection_name"],
             query=vector,
             limit=cfg["search_limit"],
+            with_payload=True,
         )
         for point in hits.points:
             if point.id not in seen_ids:
                 seen_ids.add(point.id)
                 results.append(point)
+                scores[point.id] = point.score
+            else:
+                scores[point.id] = max(scores[point.id], point.score)
 
     # Keyword search for exact phrase matching
     for keyword in keywords:
@@ -187,8 +196,7 @@ def search_qdrant(query: str) -> tuple[str, list[Source]]:
         return "Brak wyników w bazie wiedzy.", []
 
     chunks = []
-    sources = []
-    seen_youtube = set()
+    source_candidates = []
     for point in results:
         payload = point.payload
         start_seconds = int(payload["start"])
@@ -199,15 +207,27 @@ def search_qdrant(query: str) -> tuple[str, list[Source]]:
         header = f"[Odcinek: {youtube_url} | Czas: {timestamp}]"
         chunks.append(f"{header}\n{payload['text']}")
 
-        source_key = f"{payload['youtube_id']}_{start_seconds // 60}"
-        if source_key not in seen_youtube and len(sources) < 5:
+        score = scores.get(point.id, 0)
+        if score >= SOURCE_SCORE_THRESHOLD:
+            source_candidates.append((score, payload, youtube_url, timestamp))
+
+    # Deduplicate by video+minute, keep highest score, limit to MAX_SOURCES
+    source_candidates.sort(key=lambda x: x[0], reverse=True)
+    sources = []
+    seen_youtube = set()
+    for score, payload, youtube_url, timestamp in source_candidates:
+        source_key = f"{payload['youtube_id']}_{int(payload['start']) // 60}"
+        if source_key not in seen_youtube:
             seen_youtube.add(source_key)
             sources.append(Source(
                 youtube_url=youtube_url,
                 timestamp=timestamp,
                 text=payload["text"][:200],
             ))
+            if len(sources) >= MAX_SOURCES:
+                break
 
+    log.info("Returning %d sources (threshold=%.2f)", len(sources), SOURCE_SCORE_THRESHOLD)
     return "\n\n---\n\n".join(chunks), sources
 
 
