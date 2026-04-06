@@ -131,7 +131,12 @@ ZASADY:
 8. Odpowiadaj po polsku, w naturalny i przystępny sposób
 9. Używaj markdown do formatowania odpowiedzi"""
 
-app = FastAPI(title="ZGRZYT AI Backend")
+app = FastAPI(
+    title="ZGRZYT AI Backend",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -304,7 +309,7 @@ async def ask(req: AskRequest, request: Request) -> AskResponse:
             ],
         )
     except OpenAIError as e:
-        log.error("OpenAI error: %s", e)
+        log.error("OpenAI error: %s", type(e).__name__)
         raise HTTPException(
             status_code=502,
             detail="Wystąpił błąd podczas generowania odpowiedzi. Spróbuj ponownie.",
