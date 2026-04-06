@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(grep -r \"logging\\\\|monitoring\\\\|observability\\\\|prometheus\\\\|datadog\\\\|sentry\\\\|cloudwatch\" . --include=*.py --include=*.tsx --include=*.ts --include=*.json)"
+      "Bash(grep -r \"logging\\\\|monitoring\\\\|observability\\\\|prometheus\\\\|datadog\\\\|sentry\\\\|cloudwatch\" . --include=*.py --include=*.tsx --include=*.ts --include=*.json)",
+      "Bash(find /d/zgrzyt-ai -name .env* -o -name *.env)",
+      "Bash(grep -rn \"http\\\\|localhost\\\\|127\\\\|0\\\\.0\\\\.0\" /d/zgrzyt-ai --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist --exclude=*.map)"
     ]
   }
 }

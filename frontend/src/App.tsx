@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import ChatWindow from "./components/ChatWindow.tsx";
 import InputArea from "./components/InputArea.tsx";
 import type { Message } from "./types/index.ts";
@@ -8,9 +8,10 @@ const STORAGE_KEY = "zgrzyt-chat-history";
 
 const SUGGESTION_PROMPTS = [
   "Czym jest efekt spadochroniarza?",
-  "Ile Revo wyciska na klatę?",
+  "Jak nazywa się polecana aplikacja do eSIM za granicą?",
 ];
 
+type Limits = { remaining_user: number; remaining_global: number };
 
 function loadMessages(): Message[] {
   try {
@@ -36,6 +37,18 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>(loadMessages);
   const [isTyping, setIsTyping] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [limits, setLimits] = useState<Limits | null>(null);
+
+  const fetchLimits = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/limits`);
+      if (res.ok) setLimits(await res.json());
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    fetchLimits();
+  }, [fetchLimits]);
 
   const handleSend = useCallback(async (text: string) => {
     const userMsg: Message = { role: "user", content: text };
@@ -57,7 +70,21 @@ export default function App() {
       });
 
       if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
+        const error = await res.json().catch(() => null);
+        const detail =
+          error?.detail || "Wystąpił błąd. Spróbuj ponownie.";
+        const suggestReset =
+          res.status === 429 || detail.includes("sesję");
+        const content = suggestReset
+          ? `${detail}\n\nKliknij przycisk **Resetuj Sesję** w górnym menu, aby rozpocząć nową rozmowę.`
+          : detail;
+
+        setMessages((prev) => {
+          const next = [...prev, { role: "bot" as const, content }];
+          saveMessages(next);
+          return next;
+        });
+        return;
       }
 
       const data: { answer: string } = await res.json();
@@ -80,6 +107,7 @@ export default function App() {
       });
     } finally {
       setIsTyping(false);
+      fetchLimits();
     }
   }, []);
 
@@ -104,18 +132,37 @@ export default function App() {
               OPEDIA
             </span>
           </div>
-          <button
-            onClick={() => setShowResetConfirm(true)}
-            className="group flex items-center gap-3 px-5 py-2.5 bg-black/40 border border-[#7B2FFE]/30 rounded-xl hover:border-[#7B2FFE] hover:bg-[#7B2FFE]/5 transition-all active:scale-95 duration-200 relative overflow-hidden cursor-pointer"
-          >
-            <div className="absolute inset-0 bg-[#7B2FFE]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-            <span className="material-symbols-outlined text-lg text-[#7B2FFE]">
-              refresh
-            </span>
-            <span className="text-xs font-bold tracking-[0.2em] uppercase text-white/90 hidden sm:inline">
-              Resetuj Sesję
-            </span>
-          </button>
+          <div className="flex items-center gap-4">
+            {limits && (
+              <div className="hidden sm:flex items-center gap-3 text-xs text-white/40 font-medium">
+                <span>
+                  Twoje:{" "}
+                  <span className="text-white/70">
+                    {limits.remaining_user}
+                  </span>
+                </span>
+                <span className="text-white/20">·</span>
+                <span>
+                  Dzienne:{" "}
+                  <span className="text-white/70">
+                    {limits.remaining_global}
+                  </span>
+                </span>
+              </div>
+            )}
+            <button
+              onClick={() => setShowResetConfirm(true)}
+              className="group flex items-center gap-3 px-5 py-2.5 bg-black/40 border border-[#7B2FFE]/30 rounded-xl hover:border-[#7B2FFE] hover:bg-[#7B2FFE]/5 transition-all active:scale-95 duration-200 relative overflow-hidden cursor-pointer"
+            >
+              <div className="absolute inset-0 bg-[#7B2FFE]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <span className="material-symbols-outlined text-lg text-[#7B2FFE]">
+                refresh
+              </span>
+              <span className="text-xs font-bold tracking-[0.2em] uppercase text-white/90 hidden sm:inline">
+                Resetuj Sesję
+              </span>
+            </button>
+          </div>
         </div>
       </header>
 

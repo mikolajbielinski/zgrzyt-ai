@@ -1,8 +1,11 @@
 import json as json_module
 import logging
 import os
+from collections import defaultdict
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI, OpenAIError
 from pydantic import BaseModel
@@ -41,13 +44,67 @@ def load_config():
         "embedding_model": os.environ["EMBEDDING_MODEL"],
         "chat_model": os.environ["CHAT_MODEL"],
         "search_limit": int(os.environ["SEARCH_LIMIT"]),
+        "max_daily_requests": int(os.environ.get("MAX_DAILY_REQUESTS", "100")),
+        "max_daily_per_ip": int(os.environ.get("MAX_DAILY_PER_IP", "5")),
+        "max_message_length": int(os.environ.get("MAX_MESSAGE_LENGTH", "500")),
+        "max_messages": int(os.environ.get("MAX_MESSAGES", "20")),
     }
 
 
 cfg = load_config()
 
-openai_client = OpenAI()
+openai_client = OpenAI(timeout=30.0)
 qdrant = QdrantClient(url=cfg["qdrant_url"])
+
+
+POLAND_TZ = ZoneInfo("Europe/Warsaw")
+
+
+class RateLimiter:
+    def __init__(self):
+        self.global_count = 0
+        self.ip_counts: dict[str, int] = defaultdict(int)
+        self.current_period = self._period()
+
+    @staticmethod
+    def _period() -> str:
+        now = datetime.now(POLAND_TZ)
+        if now.hour < 17:
+            return (now.date() - timedelta(days=1)).isoformat()
+        return now.date().isoformat()
+
+    def _maybe_reset(self):
+        period = self._period()
+        if period != self.current_period:
+            self.global_count = 0
+            self.ip_counts.clear()
+            self.current_period = period
+
+    def check(self, ip: str) -> str | None:
+        self._maybe_reset()
+        if self.global_count >= cfg["max_daily_requests"]:
+            return "global"
+        if self.ip_counts[ip] >= cfg["max_daily_per_ip"]:
+            return "ip"
+        return None
+
+    def increment(self, ip: str):
+        self._maybe_reset()
+        self.global_count += 1
+        self.ip_counts[ip] += 1
+
+    def remaining(self, ip: str) -> tuple[int, int]:
+        self._maybe_reset()
+        user_left = max(0, cfg["max_daily_per_ip"] - self.ip_counts[ip])
+        global_left = max(0, cfg["max_daily_requests"] - self.global_count)
+        return user_left, global_left
+
+
+rate_limiter = RateLimiter()
+
+
+def get_client_ip(request: Request) -> str:
+    return request.headers.get("X-Real-IP") or request.client.host
 
 QUERY_EXPANSION_PROMPT = (
     "Użytkownik zadaje pytanie dotyczące podcastu ZGRZYT. "
@@ -193,9 +250,41 @@ def search_qdrant(query: str) -> str:
 
 
 @app.post("/ask", response_model=AskResponse)
-async def ask(req: AskRequest) -> AskResponse:
+async def ask(req: AskRequest, request: Request) -> AskResponse:
     if not req.messages:
         raise HTTPException(status_code=400, detail="Brak wiadomości")
+
+    # Rate limiting
+    client_ip = get_client_ip(request)
+    limit_type = rate_limiter.check(client_ip)
+    if limit_type == "global":
+        raise HTTPException(
+            status_code=429,
+            detail="Dzienny limit zapytań został wyczerpany. Spróbuj jutro.",
+        )
+    if limit_type == "ip":
+        raise HTTPException(
+            status_code=429,
+            detail="Osiągnąłeś dzienny limit zapytań. Zresetuj sesję i spróbuj jutro.",
+        )
+
+    # Message count limit
+    if len(req.messages) > cfg["max_messages"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Za dużo wiadomości w sesji. Zresetuj sesję, aby kontynuować.",
+        )
+
+    # Content validation
+    for msg in req.messages:
+        msg.content = msg.content.strip()
+        if not msg.content:
+            raise HTTPException(status_code=400, detail="Wiadomość nie może być pusta.")
+        if len(msg.content) > cfg["max_message_length"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Wiadomość jest za długa (max {cfg['max_message_length']} znaków).",
+            )
 
     last_user_message = next(
         (m.content for m in reversed(req.messages) if m.role == "user"), None
@@ -215,10 +304,23 @@ async def ask(req: AskRequest) -> AskResponse:
             ],
         )
     except OpenAIError as e:
-        raise HTTPException(status_code=502, detail=f"Błąd OpenAI: {e}")
+        log.error("OpenAI error: %s", e)
+        raise HTTPException(
+            status_code=502,
+            detail="Wystąpił błąd podczas generowania odpowiedzi. Spróbuj ponownie.",
+        )
+
+    rate_limiter.increment(client_ip)
 
     answer = response.choices[0].message.content or ""
     return AskResponse(answer=answer)
+
+
+@app.get("/limits")
+async def limits(request: Request):
+    client_ip = get_client_ip(request)
+    user_left, global_left = rate_limiter.remaining(client_ip)
+    return {"remaining_user": user_left, "remaining_global": global_left}
 
 
 ensure_text_index()
