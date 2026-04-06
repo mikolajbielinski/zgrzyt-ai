@@ -129,7 +129,10 @@ ZASADY:
 6. Jeśli fragmenty nie zawierają odpowiedzi, powiedz wprost że nie znalazłeś informacji
 7. NIE wymyślaj informacji których nie ma w fragmentach
 8. Odpowiadaj po polsku, w naturalny i przystępny sposób
-9. Używaj markdown do formatowania odpowiedzi"""
+9. Używaj markdown do formatowania odpowiedzi
+
+KOREKTY TRANSKRYPCJI (błędy rozpoznawania mowy):
+- "Seili", "Salee", "Sayli" → prawidłowa nazwa to **Saily** (aplikacja do eSIM)"""
 
 app = FastAPI(
     title="ZGRZYT AI Backend",
