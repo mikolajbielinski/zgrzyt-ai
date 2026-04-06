@@ -188,6 +188,7 @@ def search_qdrant(query: str) -> tuple[str, list[Source]]:
 
     chunks = []
     sources = []
+    seen_youtube = set()
     for point in results:
         payload = point.payload
         start_seconds = int(payload["start"])
@@ -197,11 +198,15 @@ def search_qdrant(query: str) -> tuple[str, list[Source]]:
         timestamp = f"{minutes}:{seconds:02d}"
         header = f"[Odcinek: {youtube_url} | Czas: {timestamp}]"
         chunks.append(f"{header}\n{payload['text']}")
-        sources.append(Source(
-            youtube_url=youtube_url,
-            timestamp=timestamp,
-            text=payload["text"][:200],
-        ))
+
+        source_key = f"{payload['youtube_id']}_{start_seconds // 60}"
+        if source_key not in seen_youtube and len(sources) < 5:
+            seen_youtube.add(source_key)
+            sources.append(Source(
+                youtube_url=youtube_url,
+                timestamp=timestamp,
+                text=payload["text"][:200],
+            ))
 
     return "\n\n---\n\n".join(chunks), sources
 
