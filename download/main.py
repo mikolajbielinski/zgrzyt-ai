@@ -2,7 +2,6 @@ import os
 import time
 from datetime import datetime
 
-import scrapetube
 import yt_dlp
 
 
@@ -26,27 +25,29 @@ def get_latest_videos(limit=None):
     if limit is None:
         limit = int(os.environ.get("PODCAST_LIMIT", "1"))
 
-    videos = scrapetube.get_channel(
-        channel_username="zgrzytpodcast",
-        limit=limit,
-    )
+    opts = {
+        "extract_flat": True,
+        "playlistend": limit,
+        "quiet": True,
+        "no_warnings": True,
+        "skip_download": True,
+    }
+    url = "https://www.youtube.com/@zgrzytpodcast/videos"
 
     results = []
-    for video in videos:
-        title = video["title"]["runs"][0]["text"]
-        video_id = video["videoId"]
-        publish_date = video.get("publishedTimeText", {}).get(
-            "simpleText", "unknown"
-        )
-
-        results.append(
-            {
-                "title": title,
-                "video_id": video_id,
-                "url": f"https://www.youtube.com/watch?v={video_id}",
-                "publish_date": publish_date,
-            }
-        )
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+        for entry in (info.get("entries") or [])[:limit]:
+            video_id = entry["id"]
+            results.append(
+                {
+                    "title": entry.get("title", "unknown"),
+                    "video_id": video_id,
+                    "url": entry.get("url")
+                    or f"https://www.youtube.com/watch?v={video_id}",
+                    "publish_date": entry.get("upload_date", "unknown"),
+                }
+            )
 
     return results
 
