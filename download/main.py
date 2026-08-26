@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 from datetime import datetime
 
@@ -71,6 +72,7 @@ def download_audio(videos, output_dir=None):
 
     os.makedirs(output_dir, exist_ok=True)
     total = len(videos)
+    stats = {"downloaded": 0, "skipped": 0, "unavailable": 0, "failed": 0}
 
     for i, video in enumerate(videos, 1):
         title = video["title"]
@@ -78,6 +80,7 @@ def download_audio(videos, output_dir=None):
 
         if is_already_downloaded(video_id, output_dir):
             print(f"[{i}/{total}] Skipping (already downloaded): {title}")
+            stats["skipped"] += 1
             continue
 
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -120,30 +123,81 @@ def download_audio(videos, output_dir=None):
             ],
         }
 
+        non_retryable_markers = (
+            "Sign in to confirm your age",
+            "confirm you're not a bot",
+            "Private video",
+            "members-only",
+            "This video is not available",
+        )
+        max_attempts = int(os.environ.get("DOWNLOAD_RETRIES", "3"))
         video_started_at = time.monotonic()
 
-        try:
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                result = ydl.download([video["url"]])
+        for attempt in range(1, max_attempts + 1):
+            try:
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    result = ydl.download([video["url"]])
 
-            if result == 0:
-                total_elapsed = time.monotonic() - video_started_at
-                print(f"  Total time: {format_duration(total_elapsed)}\n")
+                if result == 0:
+                    total_elapsed = time.monotonic() - video_started_at
+                    print(f"  Total time: {format_duration(total_elapsed)}\n")
+                    stats["downloaded"] += 1
+                else:
+                    stats["failed"] += 1
+                break
 
-        except yt_dlp.utils.DownloadError as e:
-            print(f"\n  Download error: {title}")
-            print(f"  Details: {e}")
-            print("  Skipping to next file...\n")
-            continue
-        except Exception as e:
-            print(f"\n  Unexpected error: {title}")
-            print(f"  Details: {e}")
-            print("  Skipping to next file...\n")
-            continue
+            except yt_dlp.utils.DownloadError as e:
+                details = str(e)
+                if any(marker in details for marker in non_retryable_markers):
+                    print(f"\n  Download error (not retryable): {title}")
+                    print(f"  Details: {e}")
+                    print("  Skipping to next file...\n")
+                    stats["unavailable"] += 1
+                    break
+
+                if attempt < max_attempts:
+                    wait = 10 * attempt
+                    print(
+                        f"\n  Download error (attempt {attempt}/{max_attempts}): {title}"
+                    )
+                    print(f"  Details: {e}")
+                    print(f"  Retrying in {wait}s...\n")
+                    time.sleep(wait)
+                    continue
+
+                print(f"\n  Download error after {max_attempts} attempts: {title}")
+                print(f"  Details: {e}")
+                print("  Skipping to next file...\n")
+                stats["failed"] += 1
+                break
+
+            except Exception as e:
+                print(f"\n  Unexpected error: {title}")
+                print(f"  Details: {e}")
+                print("  Skipping to next file...\n")
+                stats["failed"] += 1
+                break
+
+    return stats
 
 
 if __name__ == "__main__":
     videos = get_latest_videos()
     print(f"Found {len(videos)} videos.")
-    download_audio(videos)
-    print("Done!")
+    stats = download_audio(videos)
+
+    print(
+        "Done! "
+        f"pobrane={stats['downloaded']} "
+        f"pominiete={stats['skipped']} "
+        f"niedostepne={stats['unavailable']} "
+        f"bledy={stats['failed']}"
+    )
+
+    if stats["failed"]:
+        print(
+            f"BLAD: {stats['failed']} z {len(videos)} nie pobrano mimo ponowien. "
+            "Koncze z kodem 1, zeby Job nie zameldowal falszywego sukcesu.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
