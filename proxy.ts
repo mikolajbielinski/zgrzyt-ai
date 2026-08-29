@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { requireEnv } from "@/lib/env";
+
 export function proxy(request: NextRequest) {
-  const basicUser = process.env.BASIC_AUTH_USER ?? "admin";
-  const basicPass = process.env.BASIC_AUTH_PASS ?? "admin";
+  const basicUser = requireEnv("BASIC_AUTH_USER");
+  const basicPass = requireEnv("BASIC_AUTH_PASS");
 
   const authHeader = request.headers.get("authorization");
 

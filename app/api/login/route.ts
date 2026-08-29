@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { requireEnv } from "@/lib/env";
+
 export async function POST(request: NextRequest) {
   const { username, password } = await request.json();
 
-  const appUser = process.env.APP_USER ?? "admin";
-  const appPass = process.env.APP_PASS ?? "admin";
-  const secret = process.env.APP_SECRET ?? "secret";
+  const appUser = requireEnv("APP_USER");
+  const appPass = requireEnv("APP_PASS");
+  const secret = requireEnv("APP_SECRET");
 
   if (username !== appUser || password !== appPass) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });

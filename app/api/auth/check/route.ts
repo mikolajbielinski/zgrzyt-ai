@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { requireEnv } from "@/lib/env";
+
 export async function GET(request: NextRequest) {
   const token = request.cookies.get("app_session")?.value;
   if (!token) {
     return NextResponse.json({ authenticated: false });
   }
 
-  const secret = process.env.APP_SECRET ?? "secret";
-  const appUser = process.env.APP_USER ?? "admin";
+  const secret = requireEnv("APP_SECRET");
+  const appUser = requireEnv("APP_USER");
   const expected = Buffer.from(`${secret}:${appUser}`).toString("base64");
 
   if (token === expected) {
