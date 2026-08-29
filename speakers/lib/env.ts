@@ -32,4 +32,14 @@ export function assertRequiredEnv(): void {
 
 export const AWS_REGION = process.env.AWS_REGION ?? "eu-central-1";
 
-export const S3_PREFIX = process.env.S3_PREFIX ?? "transcripts";
+function withTrailingSlash(value: string): string {
+  return value.endsWith("/") ? value : value + "/";
+}
+
+export const S3_PREFIX_RAW = withTrailingSlash(
+  process.env.S3_PREFIX_RAW ?? "transcripts/raw/",
+);
+
+export const S3_PREFIX_LABELED = withTrailingSlash(
+  process.env.S3_PREFIX_LABELED ?? "transcripts/labeled/",
+);

@@ -1,10 +1,12 @@
 import { assertRequiredEnv } from "@/lib/env";
+import { logError, logInfo } from "@/lib/log";
 
 export function register() {
   try {
     assertRequiredEnv();
+    logInfo("startup", "all required environment variables present");
   } catch (error) {
-    console.error(error instanceof Error ? error.message : error);
+    logError("startup", "refusing to start", error);
     process.exit(1);
   }
 }

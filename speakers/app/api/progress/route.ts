@@ -1,21 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listTranscriptFiles, getTranscriptFile } from "@/lib/s3";
-
-const SPEAKER_PATTERN = /^SPEAKER_\d+$/;
-
-type Utterance = {
-  start: number;
-  end: number;
-  text: string;
-  words: unknown[];
-  speaker?: string;
-};
-
-function hasPendingSpeakers(data: Utterance[]): boolean {
-  return data.some(
-    (u) => u.speaker && SPEAKER_PATTERN.test(u.speaker)
-  );
-}
+import { getProgress } from "@/lib/s3";
+import { logError, logInfo, since } from "@/lib/log";
 
 export async function GET(request: NextRequest) {
   const token = request.cookies.get("app_session")?.value;
@@ -23,23 +8,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const startedAt = Date.now();
   try {
-    const files = await listTranscriptFiles();
-    let done = 0;
-    let pending = 0;
-
-    for (const id of files) {
-      const data = (await getTranscriptFile(id)) as Utterance[];
-      if (hasPendingSpeakers(data)) {
-        pending++;
-      } else {
-        done++;
-      }
-    }
-
-    return NextResponse.json({ done, pending, total: files.length });
+    const progress = await getProgress();
+    logInfo(
+      "progress",
+      `done=${progress.done} pending=${progress.pending} total=${progress.total} ${since(startedAt)}`,
+    );
+    return NextResponse.json(progress);
   } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: "S3 error" }, { status: 500 });
+    logError("progress", `failed after ${since(startedAt)}`, err);
+    return NextResponse.json(
+      { error: "S3 error", detail: err instanceof Error ? err.message : String(err) },
+      { status: 500 },
+    );
   }
 }

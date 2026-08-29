@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listTranscriptFiles, getTranscriptFile } from "@/lib/s3";
+import { getRawTranscript, listPending } from "@/lib/s3";
+import { logError, logInfo, since } from "@/lib/log";
 
 const SPEAKER_PATTERN = /^SPEAKER_\d+$/;
 
@@ -29,7 +30,6 @@ type SpeakerInfo = {
 };
 
 function extractSpeakers(data: Utterance[]): Record<string, SpeakerInfo> | null {
-  // Collect all utterances per speaker
   const allUtterances: Record<string, SpeakerExample[]> = {};
 
   for (const utterance of data) {
@@ -44,7 +44,6 @@ function extractSpeakers(data: Utterance[]): Record<string, SpeakerInfo> | null 
 
   if (Object.keys(allUtterances).length === 0) return null;
 
-  // Send all utterances per speaker (frontend handles pagination)
   const speakers: Record<string, SpeakerInfo> = {};
   for (const [speakerId, utterances] of Object.entries(allUtterances)) {
     speakers[speakerId] = { examples: utterances };
@@ -59,31 +58,40 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const startedAt = Date.now();
   try {
     const direction = request.nextUrl.searchParams.get("direction") ?? "desc";
-    const files = await listTranscriptFiles();
+    const files = await listPending();
     if (direction === "desc") files.reverse();
+    logInfo("files/next", `${files.length} pending, direction=${direction}`);
 
     const skippedRaw = request.cookies.get("skipped_files")?.value;
     const skipped: string[] = skippedRaw ? JSON.parse(skippedRaw) : [];
 
-    // Allow excluding specific IDs (comma-separated) for prefetching
     const excludeParam = request.nextUrl.searchParams.get("exclude") ?? "";
     const excludeIds = excludeParam ? excludeParam.split(",") : [];
 
     for (const id of files) {
       if (skipped.includes(id)) continue;
       if (excludeIds.includes(id)) continue;
-      const data = (await getTranscriptFile(id)) as Utterance[];
+      const data = (await getRawTranscript(id)) as Utterance[];
       const speakers = extractSpeakers(data);
       if (speakers) {
+        logInfo(
+          "files/next",
+          `serving ${id} with ${Object.keys(speakers).length} unnamed speaker(s), ${since(startedAt)}`,
+        );
         return NextResponse.json({ id, speakers });
       }
     }
 
+    logInfo("files/next", `nothing left to label, ${since(startedAt)}`);
     return NextResponse.json({ done: true });
   } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: "S3 error" }, { status: 500 });
+    logError("files/next", `failed after ${since(startedAt)}`, err);
+    return NextResponse.json(
+      { error: "S3 error", detail: err instanceof Error ? err.message : String(err) },
+      { status: 500 },
+    );
   }
 }
