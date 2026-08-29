@@ -13,19 +13,53 @@ permissions:
   packages: write
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      contexts: ${{ steps.select.outputs.contexts }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Detect changed build contexts
+        id: filter
+        if: github.event_name == 'push' && github.ref_type == 'branch'
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            download:
+              - 'download/**'
+            embed:
+              - 'embed/**'
+            backend:
+              - 'backend/**'
+            frontend:
+              - 'frontend/**'
+            speakers:
+              - 'speakers/**'
+
+      # A tag or a manual run has no meaningful diff to compare against,
+      # so rebuild everything. A push to main only rebuilds what changed —
+      # every build produces a new digest, and nodes re-pull each one.
+      - name: Select contexts to build
+        id: select
+        env:
+          CHANGED: ${{ steps.filter.outputs.changes }}
+          ALL: '["download","embed","backend","frontend","speakers"]'
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref_type }}" = "branch" ]; then
+            echo "contexts=$CHANGED" >> "$GITHUB_OUTPUT"
+          else
+            echo "contexts=$ALL" >> "$GITHUB_OUTPUT"
+          fi
+
   build-and-push:
+    needs: changes
+    if: needs.changes.outputs.contexts != '[]'
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        include:
-          - context: download
-            image: ghcr.io/mikolajbielinski/zgrzyt-download
-          - context: embed
-            image: ghcr.io/mikolajbielinski/zgrzyt-embed
-          - context: backend
-            image: ghcr.io/mikolajbielinski/zgrzyt-backend
-          - context: frontend
-            image: ghcr.io/mikolajbielinski/zgrzyt-frontend
+        context: ${{ fromJSON(needs.changes.outputs.contexts) }}
 
     steps:
       - name: Checkout repo
@@ -45,7 +79,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ matrix.image }}
+          images: ghcr.io/mikolajbielinski/zgrzyt-${{ matrix.context }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=sha-,enable={{is_default_branch}}
