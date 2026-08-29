@@ -5,24 +5,38 @@ import {
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 
-const s3 = new S3Client({
-  region: process.env.AWS_REGION ?? "eu-central-1",
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-  },
-});
+import { AWS_REGION, S3_PREFIX, requireEnv } from "@/lib/env";
 
-const BUCKET = process.env.S3_BUCKET!;
-const PREFIX = process.env.S3_PREFIX ?? "transcripts";
+let client: S3Client | undefined;
+
+function s3Client(): S3Client {
+  if (!client) {
+    client = new S3Client({
+      region: AWS_REGION,
+      credentials: {
+        accessKeyId: requireEnv("AWS_ACCESS_KEY_ID"),
+        secretAccessKey: requireEnv("AWS_SECRET_ACCESS_KEY"),
+      },
+    });
+  }
+  return client;
+}
+
+function bucket(): string {
+  return requireEnv("S3_BUCKET");
+}
+
+function normalisedPrefix(): string {
+  return S3_PREFIX.endsWith("/") ? S3_PREFIX : S3_PREFIX + "/";
+}
 
 export async function listTranscriptFiles(): Promise<string[]> {
-  const prefix = PREFIX.endsWith("/") ? PREFIX : PREFIX + "/";
+  const prefix = normalisedPrefix();
   const command = new ListObjectsV2Command({
-    Bucket: BUCKET,
+    Bucket: bucket(),
     Prefix: prefix,
   });
-  const response = await s3.send(command);
+  const response = await s3Client().send(command);
   const files = (response.Contents ?? [])
     .map((obj) => obj.Key ?? "")
     .filter((key) => key.endsWith(".json"))
@@ -32,24 +46,24 @@ export async function listTranscriptFiles(): Promise<string[]> {
 }
 
 export async function getTranscriptFile(id: string): Promise<unknown[]> {
-  const prefix = PREFIX.endsWith("/") ? PREFIX : PREFIX + "/";
+  const prefix = normalisedPrefix();
   const command = new GetObjectCommand({
-    Bucket: BUCKET,
+    Bucket: bucket(),
     Key: `${prefix}${id}.json`,
   });
-  const response = await s3.send(command);
+  const response = await s3Client().send(command);
   const body = await response.Body?.transformToString("utf-8");
   if (!body) throw new Error("Empty file");
   return JSON.parse(body);
 }
 
 export async function putTranscriptFile(id: string, data: unknown[]): Promise<void> {
-  const prefix = PREFIX.endsWith("/") ? PREFIX : PREFIX + "/";
+  const prefix = normalisedPrefix();
   const command = new PutObjectCommand({
-    Bucket: BUCKET,
+    Bucket: bucket(),
     Key: `${prefix}${id}.json`,
     Body: JSON.stringify(data, null, 2),
     ContentType: "application/json",
   });
-  await s3.send(command);
+  await s3Client().send(command);
 }
