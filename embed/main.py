@@ -9,9 +9,7 @@ from openai import OpenAI
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance,
-    FieldCondition,
-    Filter,
-    MatchValue,
+    PayloadSchemaType,
     PointStruct,
     VectorParams,
 )
@@ -63,16 +61,21 @@ def list_transcripts(s3, cfg):
     return ids
 
 
-def is_processed(qdrant, cfg, youtube_id):
-    result = qdrant.count(
-        collection_name=cfg["collection_name"],
-        count_filter=Filter(
-            must=[
-                FieldCondition(key="youtube_id", match=MatchValue(value=youtube_id))
-            ]
-        ),
-    )
-    return result.count > 0
+def list_embedded_ids(qdrant, cfg):
+    ids = set()
+    offset = None
+    while True:
+        points, offset = qdrant.scroll(
+            collection_name=cfg["collection_name"],
+            limit=1000,
+            offset=offset,
+            with_payload=["youtube_id"],
+            with_vectors=False,
+        )
+        for point in points:
+            ids.add(point.payload["youtube_id"])
+        if offset is None:
+            return ids
 
 
 def load_transcript(s3, cfg, youtube_id):
@@ -162,6 +165,12 @@ def ensure_collection(qdrant, cfg):
         )
         log.info("Created collection '%s'", cfg["collection_name"])
 
+    qdrant.create_payload_index(
+        collection_name=cfg["collection_name"],
+        field_name="youtube_id",
+        field_schema=PayloadSchemaType.KEYWORD,
+    )
+
 
 def store_chunks(qdrant, cfg, chunks, embeddings):
     points = []
@@ -194,7 +203,7 @@ def main():
     cfg = load_config()
 
     s3 = boto3.client("s3")
-    qdrant = QdrantClient(url=cfg["qdrant_url"])
+    qdrant = QdrantClient(url=cfg["qdrant_url"], timeout=120)
     openai_client = OpenAI()
     tokenizer = tiktoken.encoding_for_model(cfg["embedding_model"])
 
@@ -203,7 +212,10 @@ def main():
     transcript_ids = list_transcripts(s3, cfg)
     log.info("Found %d transcripts in s3://%s/%s", len(transcript_ids), cfg["s3_bucket"], cfg["s3_prefix"])
 
-    new_ids = [tid for tid in transcript_ids if not is_processed(qdrant, cfg, tid)]
+    embedded = list_embedded_ids(qdrant, cfg)
+    log.info("Already in Qdrant: %d", len(embedded))
+
+    new_ids = [tid for tid in transcript_ids if tid not in embedded]
     log.info("New transcripts to process: %d", len(new_ids))
 
     for i, youtube_id in enumerate(new_ids, 1):
