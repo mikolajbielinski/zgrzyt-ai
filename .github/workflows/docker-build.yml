@@ -37,6 +37,8 @@ jobs:
               - 'frontend/**'
             speakers:
               - 'speakers/**'
+            orchestrator:
+              - 'orchestrator/**'
 
       # A tag or a manual run has no meaningful diff to compare against,
       # so rebuild everything. A push to main only rebuilds what changed —
@@ -45,7 +47,7 @@ jobs:
         id: select
         env:
           CHANGED: ${{ steps.filter.outputs.changes }}
-          ALL: '["download","embed","backend","frontend","speakers"]'
+          ALL: '["download","embed","backend","frontend","speakers","orchestrator"]'
         run: |
           if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref_type }}" = "branch" ]; then
             echo "contexts=$CHANGED" >> "$GITHUB_OUTPUT"

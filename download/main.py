@@ -188,16 +188,16 @@ if __name__ == "__main__":
 
     print(
         "Done! "
-        f"pobrane={stats['downloaded']} "
-        f"pominiete={stats['skipped']} "
-        f"niedostepne={stats['unavailable']} "
-        f"bledy={stats['failed']}"
+        f"downloaded={stats['downloaded']} "
+        f"skipped={stats['skipped']} "
+        f"unavailable={stats['unavailable']} "
+        f"failed={stats['failed']}"
     )
 
     if stats["failed"]:
         print(
-            f"BLAD: {stats['failed']} z {len(videos)} nie pobrano mimo ponowien. "
-            "Koncze z kodem 1, zeby Job nie zameldowal falszywego sukcesu.",
+            f"ERROR: {stats['failed']} of {len(videos)} could not be downloaded after retries. "
+            "Exiting with code 1 so the Job does not report a false success.",
             file=sys.stderr,
         )
         sys.exit(1)
