@@ -1,9 +1,9 @@
 import json
 import logging
 import os
-import subprocess
 import uuid
 
+import boto3
 import tiktoken
 from openai import OpenAI
 from qdrant_client import QdrantClient
@@ -22,7 +22,6 @@ log = logging.getLogger(__name__)
 REQUIRED_ENV_VARS = [
     "S3_BUCKET",
     "S3_PREFIX",
-    "TRANSCRIPTS_DIR",
     "QDRANT_URL",
     "COLLECTION_NAME",
     "CHUNK_MAX_TOKENS",
@@ -41,8 +40,7 @@ def load_config():
 
     return {
         "s3_bucket": os.environ["S3_BUCKET"],
-        "s3_prefix": os.environ["S3_PREFIX"],
-        "transcripts_dir": os.environ["TRANSCRIPTS_DIR"],
+        "s3_prefix": os.environ["S3_PREFIX"].rstrip("/") + "/",
         "qdrant_url": os.environ["QDRANT_URL"],
         "collection_name": os.environ["COLLECTION_NAME"],
         "chunk_max_tokens": int(os.environ["CHUNK_MAX_TOKENS"]),
@@ -52,28 +50,16 @@ def load_config():
     }
 
 
-def sync_transcripts_from_s3(cfg):
-    source = f"s3://{cfg['s3_bucket']}/{cfg['s3_prefix']}"
-    log.info("Syncing %s -> %s", source, cfg["transcripts_dir"])
-    result = subprocess.run(
-        ["aws", "s3", "sync", source, cfg["transcripts_dir"]],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(f"S3 sync failed: {result.stderr}")
-    if result.stdout.strip():
-        log.info("S3 sync output:\n%s", result.stdout.strip())
-    else:
-        log.info("S3 sync: already up to date")
-
-
-def list_local_transcripts(cfg):
+def list_transcripts(s3, cfg):
+    prefix = cfg["s3_prefix"]
     ids = []
-    for filename in os.listdir(cfg["transcripts_dir"]):
-        if filename.endswith(".json"):
-            youtube_id = filename.removesuffix(".json")
-            ids.append(youtube_id)
+    for page in s3.get_paginator("list_objects_v2").paginate(
+        Bucket=cfg["s3_bucket"], Prefix=prefix
+    ):
+        for obj in page.get("Contents", []):
+            name = obj["Key"][len(prefix) :]
+            if name.endswith(".json") and "/" not in name:
+                ids.append(name.removesuffix(".json"))
     return ids
 
 
@@ -89,10 +75,10 @@ def is_processed(qdrant, cfg, youtube_id):
     return result.count > 0
 
 
-def load_transcript(cfg, youtube_id):
-    path = os.path.join(cfg["transcripts_dir"], f"{youtube_id}.json")
-    with open(path) as f:
-        return json.load(f)
+def load_transcript(s3, cfg, youtube_id):
+    key = f"{cfg['s3_prefix']}{youtube_id}.json"
+    body = s3.get_object(Bucket=cfg["s3_bucket"], Key=key)["Body"].read()
+    return json.loads(body)
 
 
 def chunk_transcript(segments, youtube_id, max_tokens, tokenizer):
@@ -131,12 +117,9 @@ def chunk_transcript(segments, youtube_id, max_tokens, tokenizer):
             last = chunk_utterances[-1]
             chunk_utterances = [last]
             chunk_tokens = last["tokens"]
-        else:
-            chunk_tokens += utt_tokens
 
+        chunk_tokens += utt_tokens
         chunk_utterances.append({**utt, "formatted": formatted, "tokens": utt_tokens})
-        if chunk_tokens == 0:
-            chunk_tokens = utt_tokens
 
     if chunk_utterances:
         chunks.append(_build_chunk(chunk_utterances, youtube_id, len(chunks)))
@@ -210,16 +193,15 @@ def store_chunks(qdrant, cfg, chunks, embeddings):
 def main():
     cfg = load_config()
 
-    sync_transcripts_from_s3(cfg)
-
+    s3 = boto3.client("s3")
     qdrant = QdrantClient(url=cfg["qdrant_url"])
     openai_client = OpenAI()
     tokenizer = tiktoken.encoding_for_model(cfg["embedding_model"])
 
     ensure_collection(qdrant, cfg)
 
-    transcript_ids = list_local_transcripts(cfg)
-    log.info("Found %d transcripts locally", len(transcript_ids))
+    transcript_ids = list_transcripts(s3, cfg)
+    log.info("Found %d transcripts in s3://%s/%s", len(transcript_ids), cfg["s3_bucket"], cfg["s3_prefix"])
 
     new_ids = [tid for tid in transcript_ids if not is_processed(qdrant, cfg, tid)]
     log.info("New transcripts to process: %d", len(new_ids))
@@ -227,7 +209,7 @@ def main():
     for i, youtube_id in enumerate(new_ids, 1):
         log.info("[%d/%d] Processing %s", i, len(new_ids), youtube_id)
 
-        segments = load_transcript(cfg, youtube_id)
+        segments = load_transcript(s3, cfg, youtube_id)
         chunks = chunk_transcript(
             segments, youtube_id, cfg["chunk_max_tokens"], tokenizer
         )
