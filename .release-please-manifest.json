@@ -1,8 +1,8 @@
 {
-    "zgrzyt-embed": "1.0.0",
-    "zgrzyt-frontend": "1.0.0",
-    "zgrzyt-backend": "1.0.0",
-    "zgrzyt-download": "1.0.0",
-    "zgrzyt-orchestator": "1.0.0",
-    "zgrzyt-speakers": "1.0.0"
+    "embed": "1.0.0",
+    "frontend": "1.0.0",
+    "backend": "1.0.0",
+    "download": "1.0.0",
+    "orchestrator": "1.0.0",
+    "speakers": "1.0.0"
 }
