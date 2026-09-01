@@ -4,28 +4,22 @@
   "tag-separator": "@",
   "separate-pull-requests": true,
   "packages": {
-    "zgrzyt-embed": {
-      "path": "embed",
+    "embed": {
       "release-type": "simple"
     },
-    "zgrzyt-frontend": {
-      "path": "frontend",
+    "frontend": {
       "release-type": "node"
     },
-    "zgrzyt-backend": {
-      "path": "backend",
+    "backend": {
       "release-type": "simple"
     },
-    "zgrzyt-download": {
-      "path": "download",
+    "download": {
       "release-type": "simple"
     },
-    "zgrzyt-orchestrator": {
-      "path": "orchestrator",
+    "orchestrator": {
       "release-type": "simple"
     },
-    "zgrzyt-speakers": {
-      "path": "speakers",
+    "speakers": {
       "release-type": "node"
     }
   },
