@@ -6,7 +6,7 @@
   "packages": {
     "zgrzyt-embed": {
       "path": "embed",
-      "release-type": "python"
+      "release-type": "simple"
     },
     "zgrzyt-frontend": {
       "path": "frontend",
@@ -14,15 +14,15 @@
     },
     "zgrzyt-backend": {
       "path": "backend",
-      "release-type": "python"
+      "release-type": "simple"
     },
     "zgrzyt-download": {
       "path": "download",
-      "release-type": "python"
+      "release-type": "simple"
     },
     "zgrzyt-orchestrator": {
       "path": "orchestrator",
-      "release-type": "python"
+      "release-type": "simple"
     },
     "zgrzyt-speakers": {
       "path": "speakers",
