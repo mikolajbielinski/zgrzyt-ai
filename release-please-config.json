@@ -2,22 +2,22 @@
   "include-component-in-tag": true,
   "include-v-in-tag": true,
   "tag-separator": "@",
-  "separate-pull-requests": false,
+  "separate-pull-requests": true,
   "packages": {
     "embed": {
-      "release-type": "simple"
+      "release-type": "python"
     },
     "frontend": {
       "release-type": "node"
     },
     "backend": {
-      "release-type": "simple"
+      "release-type": "python"
     },
     "download": {
-      "release-type": "simple"
+      "release-type": "python"
     },
     "orchestrator": {
-      "release-type": "simple"
+      "release-type": "python"
     },
     "speakers": {
       "release-type": "node"
