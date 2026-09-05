@@ -22,8 +22,8 @@ src/
 ## Development
 
 ```bash
-npm ci
-npm run dev     # Vite dev server, expects the backend on the proxy target
-npm run build   # -> dist/
-npm run lint
+bun ci
+bun run dev     # Vite dev server, expects the backend on the proxy target
+bun run build   # -> dist/
+bun run lint
 ```

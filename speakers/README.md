@@ -55,7 +55,7 @@ Optional, with sensible defaults: `AWS_REGION` (`eu-central-1`), `S3_PREFIX_RAW`
 ## Development
 
 ```bash
-npm ci
-npm run dev
-npm run lint
+bun ci
+bun run dev
+bun run lint
 ```

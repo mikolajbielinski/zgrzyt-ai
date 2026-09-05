@@ -2,6 +2,8 @@ FROM python:3.14-slim
 
 ARG DENO_VERSION=2.9.5
 
+COPY --from=ghcr.io/astral-sh/uv:0.10.7 /uv /uvx /bin/
+
 WORKDIR /app
 
 RUN apt-get update \
@@ -17,15 +19,22 @@ RUN apt-get update \
 
 ENV DENO_DIR=/tmp/deno
 
-COPY requirements.txt main.py /app/
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
 
-RUN pip install --no-cache-dir -r /app/requirements.txt
+COPY pyproject.toml uv.lock /app/
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-dev
+
+COPY main.py /app/
 
 RUN mkdir /podcasts
 
 RUN useradd podcastUser
 
 RUN chown podcastUser /podcasts
+
+ENV PATH="/app/.venv/bin:${PATH}"
 
 USER podcastUser
 

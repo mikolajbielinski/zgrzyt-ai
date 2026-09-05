@@ -1,13 +1,6 @@
 node_modules
 .next
-.git
-.gitignore
-.claude
-.vercel
-README.md
-Dockerfile
-.dockerignore
-npm-debug.log*
-.env*
+.env
+.env.*
 coverage
 *.tsbuildinfo
