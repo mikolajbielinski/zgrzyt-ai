@@ -1,56 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRawTranscript, listPending } from "@/lib/s3";
 import { logError, logInfo, since } from "@/lib/log";
-
-const SPEAKER_PATTERN = /^SPEAKER_\d+$/;
-
-type Word = {
-  word: string;
-  start?: number;
-  end?: number;
-  score?: number;
-  speaker?: string;
-};
-
-type Utterance = {
-  start: number;
-  end: number;
-  text: string;
-  words: Word[];
-  speaker?: string;
-};
-
-type SpeakerExample = {
-  text: string;
-  timestamp: number;
-};
-
-type SpeakerInfo = {
-  examples: SpeakerExample[];
-};
-
-function extractSpeakers(data: Utterance[]): Record<string, SpeakerInfo> | null {
-  const allUtterances: Record<string, SpeakerExample[]> = {};
-
-  for (const utterance of data) {
-    const speakerId = utterance.speaker;
-    if (!speakerId || !SPEAKER_PATTERN.test(speakerId)) continue;
-    if (!allUtterances[speakerId]) allUtterances[speakerId] = [];
-    allUtterances[speakerId].push({
-      text: utterance.text.trim(),
-      timestamp: utterance.start,
-    });
-  }
-
-  if (Object.keys(allUtterances).length === 0) return null;
-
-  const speakers: Record<string, SpeakerInfo> = {};
-  for (const [speakerId, utterances] of Object.entries(allUtterances)) {
-    speakers[speakerId] = { examples: utterances };
-  }
-
-  return speakers;
-}
+import { extractSpeakers, type Utterance } from "@/lib/transcripts";
 
 export async function GET(request: NextRequest) {
   const token = request.cookies.get("app_session")?.value;

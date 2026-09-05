@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 type ProgressData = {
@@ -39,9 +40,7 @@ export default function ProgressPage() {
 
   if (error) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-red-400">
-        {error}
-      </div>
+      <div className="flex min-h-screen items-center justify-center text-red-400">{error}</div>
     );
   }
 
@@ -70,12 +69,9 @@ export default function ProgressPage() {
           </p>
         </div>
 
-        <a
-          href="/"
-          className="block text-center text-sm text-blue-400 hover:text-blue-300"
-        >
+        <Link href="/" className="block text-center text-sm text-blue-400 hover:text-blue-300">
           Wroc do labelowania
-        </a>
+        </Link>
       </div>
     </div>
   );

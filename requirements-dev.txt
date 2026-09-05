@@ -1,0 +1,5 @@
+-r backend/requirements-test.txt
+-r download/requirements-test.txt
+-r embed/requirements-test.txt
+-r orchestrator/requirements-test.txt
+ruff

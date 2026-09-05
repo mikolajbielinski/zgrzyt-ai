@@ -40,7 +40,7 @@ export default function InputArea({ onSend, disabled }: InputAreaProps) {
         handleSubmit();
       }
     },
-    [handleSubmit]
+    [handleSubmit],
   );
 
   return (

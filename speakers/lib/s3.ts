@@ -5,12 +5,7 @@ import {
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 
-import {
-  AWS_REGION,
-  S3_PREFIX_LABELED,
-  S3_PREFIX_RAW,
-  requireEnv,
-} from "@/lib/env";
+import { AWS_REGION, S3_PREFIX_LABELED, S3_PREFIX_RAW, requireEnv } from "@/lib/env";
 import { logInfo, since } from "@/lib/log";
 
 let client: S3Client | undefined;
@@ -65,10 +60,7 @@ async function listIds(prefix: string): Promise<string[]> {
 }
 
 export async function listPending(): Promise<string[]> {
-  const [raw, labeled] = await Promise.all([
-    listIds(S3_PREFIX_RAW),
-    listIds(S3_PREFIX_LABELED),
-  ]);
+  const [raw, labeled] = await Promise.all([listIds(S3_PREFIX_RAW), listIds(S3_PREFIX_LABELED)]);
   const done = new Set(labeled);
   const pending = raw.filter((id) => !done.has(id));
   logInfo("s3", `pending = raw(${raw.length}) - labeled(${labeled.length}) = ${pending.length}`);
@@ -80,10 +72,7 @@ export async function getProgress(): Promise<{
   pending: number;
   total: number;
 }> {
-  const [raw, labeled] = await Promise.all([
-    listIds(S3_PREFIX_RAW),
-    listIds(S3_PREFIX_LABELED),
-  ]);
+  const [raw, labeled] = await Promise.all([listIds(S3_PREFIX_RAW), listIds(S3_PREFIX_LABELED)]);
   const done = new Set(labeled);
   return {
     done: labeled.length,
@@ -96,9 +85,7 @@ export async function getRawTranscript(id: string): Promise<unknown[]> {
   const startedAt = Date.now();
   const key = `${S3_PREFIX_RAW}${id}.json`;
 
-  const response = await s3Client().send(
-    new GetObjectCommand({ Bucket: bucket(), Key: key }),
-  );
+  const response = await s3Client().send(new GetObjectCommand({ Bucket: bucket(), Key: key }));
   const body = await response.Body?.transformToString("utf-8");
   if (!body) throw new Error(`Empty object: ${key}`);
 

@@ -3,6 +3,7 @@ import logging
 import os
 from collections import defaultdict
 from datetime import datetime, timedelta
+from typing import Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, HTTPException, Request
@@ -17,7 +18,6 @@ from qdrant_client.models import (
     TextIndexParams,
     TokenizerType,
 )
-from typing import Literal
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
@@ -106,13 +106,14 @@ rate_limiter = RateLimiter()
 def get_client_ip(request: Request) -> str:
     return request.headers.get("X-Real-IP") or request.client.host
 
+
 QUERY_EXPANSION_PROMPT = (
     "Użytkownik zadaje pytanie dotyczące podcastu ZGRZYT. "
     "Wygeneruj 3 różne zapytania wyszukiwania które pomogą znaleźć "
     "odpowiednie fragmenty transkrypcji. Uwzględnij synonimy, parafrazy "
     "i powiązane konteksty. Wyodrębnij też kluczowe frazy do wyszukiwania "
     "dosłownego (dokładne nazwy, terminy, wyrażenia z pytania).\n\n"
-    'Odpowiedz TYLKO w formacie JSON:\n'
+    "Odpowiedz TYLKO w formacie JSON:\n"
     '{"queries": ["zapytanie 1", "zapytanie 2", "zapytanie 3"], '
     '"keywords": ["fraza 1", "fraza 2"]}'
 )
@@ -248,7 +249,9 @@ def search_qdrant(query: str) -> str:
     for point in results:
         payload = point.payload
         start_seconds = int(payload["start"])
-        youtube_url = f"https://youtube.com/watch?v={payload['youtube_id']}&t={start_seconds}s"
+        youtube_url = (
+            f"https://youtube.com/watch?v={payload['youtube_id']}&t={start_seconds}s"
+        )
         minutes = int(payload["start"] // 60)
         seconds = int(payload["start"] % 60)
         header = f"[Odcinek: {youtube_url} | Czas: {minutes}:{seconds:02d}]"

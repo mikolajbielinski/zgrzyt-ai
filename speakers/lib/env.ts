@@ -36,9 +36,7 @@ function withTrailingSlash(value: string): string {
   return value.endsWith("/") ? value : value + "/";
 }
 
-export const S3_PREFIX_RAW = withTrailingSlash(
-  process.env.S3_PREFIX_RAW ?? "transcripts/raw/",
-);
+export const S3_PREFIX_RAW = withTrailingSlash(process.env.S3_PREFIX_RAW ?? "transcripts/raw/");
 
 export const S3_PREFIX_LABELED = withTrailingSlash(
   process.env.S3_PREFIX_LABELED ?? "transcripts/labeled/",
