@@ -48,5 +48,15 @@ jobs:
           uses: actions/checkout@v7
         - name: Install UV
           run: curl -LsSf https://astral.sh/uv/install.sh | sh
+        - name: Cache dependencies
+          uses: actions/cache@v6
+          with:
+            path: ~/.cache/pip
+            key: ${{ matrix.components }}-pip-${{ hashFiles('**/uv.lock') }}
         - name: Install dependencies
-          run: uv sync --locked && ls
+          run: uv sync --locked --only-dev
+        - name: Run checks
+          run: | 
+            uv run pytest 
+            uv run ruff check .
+            uv run ruff format --check .
