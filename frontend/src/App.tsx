@@ -43,73 +43,76 @@ export default function App() {
     try {
       const res = await fetch(`${API_URL}/limits`);
       if (res.ok) setLimits(await res.json());
-    } catch {}
+    } catch {
+      return;
+    }
   }, []);
 
   useEffect(() => {
     fetchLimits();
   }, [fetchLimits]);
 
-  const handleSend = useCallback(async (text: string) => {
-    const userMsg: Message = { role: "user", content: text };
+  const handleSend = useCallback(
+    async (text: string) => {
+      const userMsg: Message = { role: "user", content: text };
 
-    setMessages((prev) => {
-      const next = [...prev, userMsg];
-      saveMessages(next);
-      return next;
-    });
-    setIsTyping(true);
-
-    try {
-      const history = [...loadMessages(), userMsg];
-
-      const res = await fetch(`${API_URL}/ask`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: toApiMessages(history) }),
+      setMessages((prev) => {
+        const next = [...prev, userMsg];
+        saveMessages(next);
+        return next;
       });
+      setIsTyping(true);
 
-      if (!res.ok) {
-        const error = await res.json().catch(() => null);
-        const detail =
-          error?.detail || "Wystąpił błąd. Spróbuj ponownie.";
-        const suggestReset =
-          res.status === 429 || detail.includes("sesję");
-        const content = suggestReset
-          ? `${detail}\n\nKliknij przycisk **Resetuj Sesję** w górnym menu, aby rozpocząć nową rozmowę.`
-          : detail;
+      try {
+        const history = [...loadMessages(), userMsg];
+
+        const res = await fetch(`${API_URL}/ask`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages: toApiMessages(history) }),
+        });
+
+        if (!res.ok) {
+          const error = await res.json().catch(() => null);
+          const detail = error?.detail || "Wystąpił błąd. Spróbuj ponownie.";
+          const suggestReset = res.status === 429 || detail.includes("sesję");
+          const content = suggestReset
+            ? `${detail}\n\nKliknij przycisk **Resetuj Sesję** w górnym menu, aby rozpocząć nową rozmowę.`
+            : detail;
+
+          setMessages((prev) => {
+            const next = [...prev, { role: "bot" as const, content }];
+            saveMessages(next);
+            return next;
+          });
+          return;
+        }
+
+        const data: { answer: string } = await res.json();
+        const botMsg: Message = { role: "bot", content: data.answer };
 
         setMessages((prev) => {
-          const next = [...prev, { role: "bot" as const, content }];
+          const next = [...prev, botMsg];
           saveMessages(next);
           return next;
         });
-        return;
+      } catch {
+        const errorMsg: Message = {
+          role: "bot",
+          content: "Nie udało się połączyć z serwerem. Spróbuj ponownie.",
+        };
+        setMessages((prev) => {
+          const next = [...prev, errorMsg];
+          saveMessages(next);
+          return next;
+        });
+      } finally {
+        setIsTyping(false);
+        fetchLimits();
       }
-
-      const data: { answer: string } = await res.json();
-      const botMsg: Message = { role: "bot", content: data.answer };
-
-      setMessages((prev) => {
-        const next = [...prev, botMsg];
-        saveMessages(next);
-        return next;
-      });
-    } catch {
-      const errorMsg: Message = {
-        role: "bot",
-        content: "Nie udało się połączyć z serwerem. Spróbuj ponownie.",
-      };
-      setMessages((prev) => {
-        const next = [...prev, errorMsg];
-        saveMessages(next);
-        return next;
-      });
-    } finally {
-      setIsTyping(false);
-      fetchLimits();
-    }
-  }, []);
+    },
+    [fetchLimits],
+  );
 
   const handleReset = useCallback(() => {
     setMessages([]);
@@ -136,17 +139,11 @@ export default function App() {
             {limits && (
               <div className="hidden sm:flex items-center gap-3 text-xs text-white/40 font-medium">
                 <span>
-                  Twoje:{" "}
-                  <span className="text-white/70">
-                    {limits.remaining_user}
-                  </span>
+                  Twoje: <span className="text-white/70">{limits.remaining_user}</span>
                 </span>
                 <span className="text-white/20">·</span>
                 <span>
-                  Dzienne:{" "}
-                  <span className="text-white/70">
-                    {limits.remaining_global}
-                  </span>
+                  Dzienne: <span className="text-white/70">{limits.remaining_global}</span>
                 </span>
               </div>
             )}
@@ -155,9 +152,7 @@ export default function App() {
               className="group flex items-center gap-3 px-5 py-2.5 bg-black/40 border border-[#7B2FFE]/30 rounded-xl hover:border-[#7B2FFE] hover:bg-[#7B2FFE]/5 transition-all active:scale-95 duration-200 relative overflow-hidden cursor-pointer"
             >
               <div className="absolute inset-0 bg-[#7B2FFE]/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-              <span className="material-symbols-outlined text-lg text-[#7B2FFE]">
-                refresh
-              </span>
+              <span className="material-symbols-outlined text-lg text-[#7B2FFE]">refresh</span>
               <span className="text-xs font-bold tracking-[0.2em] uppercase text-white/90 hidden sm:inline">
                 Resetuj Sesję
               </span>
@@ -192,7 +187,14 @@ export default function App() {
       )}
 
       {/* Main Content */}
-      <main className="h-screen pt-28 pb-32 overflow-y-auto relative" style={{ backgroundImage: 'radial-gradient(circle at 0% 0%, rgba(123, 47, 254, 0.08) 0%, transparent 40%), radial-gradient(circle at 100% 100%, rgba(123, 47, 254, 0.08) 0%, transparent 40%), radial-gradient(circle at 50% 50%, rgba(123, 47, 254, 0.03) 0%, transparent 60%)', backgroundAttachment: 'fixed' }}>
+      <main
+        className="h-screen pt-28 pb-32 overflow-y-auto relative"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at 0% 0%, rgba(123, 47, 254, 0.08) 0%, transparent 40%), radial-gradient(circle at 100% 100%, rgba(123, 47, 254, 0.08) 0%, transparent 40%), radial-gradient(circle at 50% 50%, rgba(123, 47, 254, 0.03) 0%, transparent 60%)",
+          backgroundAttachment: "fixed",
+        }}
+      >
         <div className="max-w-[800px] mx-auto px-6 py-8 flex flex-col gap-12">
           {isEmpty ? (
             <div className="flex flex-col items-center text-center py-12 space-y-6">

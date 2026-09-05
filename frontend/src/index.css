@@ -2,18 +2,18 @@
 
 @theme {
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
-  --color-bg: #0A0A0A;
+  --color-bg: #0a0a0a;
   --color-bg-light: #111111;
-  --color-bg-lighter: #1A1A1A;
+  --color-bg-lighter: #1a1a1a;
   --color-bg-input: #141414;
   --color-border: #222222;
   --color-text: #ffffff;
-  --color-text-muted: #A0A0A0;
+  --color-text-muted: #a0a0a0;
   --color-text-dim: #666666;
-  --color-accent: #7B2FFE;
-  --color-accent-hover: #9B5FFF;
+  --color-accent: #7b2ffe;
+  --color-accent-hover: #9b5fff;
   --color-accent-glow: rgba(123, 47, 254, 0.3);
-  --color-surface: #0A0A0A;
+  --color-surface: #0a0a0a;
   --color-surface-container: #1a1919;
   --color-surface-container-high: #201f1f;
   --color-surface-container-highest: #262626;
@@ -38,7 +38,11 @@ body {
 }
 
 .material-symbols-outlined {
-  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  font-variation-settings:
+    "FILL" 0,
+    "wght" 400,
+    "GRAD" 0,
+    "opsz" 24;
 }
 
 /* Noise texture overlay */
@@ -72,7 +76,7 @@ body::before {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #7B2FFE;
+  background: #7b2ffe;
   border-radius: 10px;
 }
 
@@ -131,7 +135,9 @@ body::before {
 
 /* Typing indicator pulse */
 @keyframes pulse-dot {
-  0%, 80%, 100% {
+  0%,
+  80%,
+  100% {
     opacity: 0.3;
     transform: scale(0.8);
   }

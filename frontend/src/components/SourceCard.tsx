@@ -5,20 +5,13 @@ interface SourceCardProps {
   timestamp?: string;
 }
 
-export default function SourceCard({
-  quote,
-  speaker,
-  source,
-  timestamp,
-}: SourceCardProps) {
+export default function SourceCard({ quote, speaker, source, timestamp }: SourceCardProps) {
   return (
     <div className="bg-surface-container-low/60 backdrop-blur-sm rounded-xl p-4 flex flex-col gap-3">
       {(source || timestamp) && (
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-accent text-sm">
-              history_edu
-            </span>
+            <span className="material-symbols-outlined text-accent text-sm">history_edu</span>
             {source && (
               <span className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
                 {source}
@@ -33,9 +26,7 @@ export default function SourceCard({
         </div>
       )}
       <blockquote className="border-l-2 border-accent/40 pl-4 py-1">
-        <p className="text-on-surface-variant italic text-xs leading-normal">
-          {quote}
-        </p>
+        <p className="text-on-surface-variant italic text-xs leading-normal">{quote}</p>
       </blockquote>
       {speaker && (
         <div className="flex items-center gap-1.5 self-end">

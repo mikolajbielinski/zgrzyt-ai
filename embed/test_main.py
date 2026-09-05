@@ -39,26 +39,48 @@ def segments(count, words_per_utterance, speaker_prefix="S"):
     ]
 
 
-def test_no_chunk_exceeds_the_limit(tokenizer):
+def test_chunks_respect_limit_when_individual_utterances_fit(tokenizer):
     chunks = main.chunk_transcript(segments(20, 200), "vid", 500, tokenizer)
     assert chunks
     for chunk in chunks:
         assert len(tokenizer.encode(chunk["text"])) <= 500, chunk["chunk_index"]
 
 
-def test_no_utterance_is_lost(tokenizer):
-    segs = segments(20, 50)
-    chunks = main.chunk_transcript(segs, "vid", 200, tokenizer)
-    joined = " ".join(c["text"] for c in chunks)
-    for seg in segs:
-        for word in seg["text"].split():
-            assert word in joined
+def test_last_utterance_is_used_as_overlap(tokenizer):
+    segs = [
+        {"speaker": "A", "text": "a1 a2", "start": 0.0, "end": 1.0},
+        {"speaker": "B", "text": "b1 b2", "start": 1.0, "end": 2.0},
+        {"speaker": "C", "text": "c1 c2", "start": 2.0, "end": 3.0},
+    ]
+
+    chunks = main.chunk_transcript(segs, "vid", 7, tokenizer)
+
+    assert [chunk["text"] for chunk in chunks] == [
+        "[A]: a1 a2\n[B]: b1 b2",
+        "[B]: b1 b2\n[C]: c1 c2",
+    ]
+
+
+def test_overlap_is_dropped_if_it_would_exceed_limit(tokenizer):
+    segs = [
+        {"speaker": "A", "text": "a1 a2 a3", "start": 0.0, "end": 1.0},
+        {"speaker": "B", "text": "b1 b2 b3", "start": 1.0, "end": 2.0},
+    ]
+
+    chunks = main.chunk_transcript(segs, "vid", 5, tokenizer)
+
+    assert [chunk["text"] for chunk in chunks] == [
+        "[A]: a1 a2 a3",
+        "[B]: b1 b2 b3",
+    ]
+    assert all(len(tokenizer.encode(chunk["text"])) <= 5 for chunk in chunks)
 
 
 def test_single_utterance_longer_than_limit(tokenizer):
     chunks = main.chunk_transcript(segments(1, 900), "vid", 100, tokenizer)
     assert len(chunks) == 1
     assert "w0x0" in chunks[0]["text"]
+    assert len(tokenizer.encode(chunks[0]["text"])) > 100
 
 
 def test_chunks_are_indexed_and_carry_timestamps(tokenizer):
@@ -77,6 +99,18 @@ def test_consecutive_segments_of_same_speaker_are_merged(tokenizer):
     ]
     chunks = main.chunk_transcript(segs, "vid", 1000, tokenizer)
     assert chunks[0]["text"] == "[Gimper]: raz dwa\n[Revo]: trzy"
+
+
+def test_speakers_keep_first_appearance_order(tokenizer):
+    segs = [
+        {"speaker": "Revo", "text": "raz", "start": 0.0, "end": 1.0},
+        {"speaker": "Gimper", "text": "dwa", "start": 1.0, "end": 2.0},
+        {"speaker": "Revo", "text": "trzy", "start": 2.0, "end": 3.0},
+    ]
+
+    chunks = main.chunk_transcript(segs, "vid", 1000, tokenizer)
+
+    assert chunks[0]["speakers"] == ["Revo", "Gimper"]
 
 
 def test_empty_segments_are_skipped(tokenizer):

@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timedelta, timezone
 
 import boto3
 import pytest
@@ -56,10 +57,15 @@ def launch_instance(state="stopped"):
 
 
 def test_empty_bucket_does_nothing(s3, sent):
-    ec2, _ = launch_instance()
+    ec2, instance_id = launch_instance()
     main.start_transcription(s3, ec2)
     main.notify_ready_to_label(s3)
     main.alert_failures(s3)
+
+    state = ec2.describe_instances(InstanceIds=[instance_id])["Reservations"][0][
+        "Instances"
+    ][0]["State"]["Name"]
+    assert state == "stopped"
     assert sent == []
 
 
@@ -146,7 +152,50 @@ def test_alerts_once_per_failure(s3, sent):
     assert sent[0][2] == "high"
 
 
-def test_pagination_over_1000_keys(s3):
-    for i in range(1005):
-        put(s3, f"transcripts/raw/ep{i:05d}.json")
-    assert len(main.list_ids(s3, "transcripts/raw/", ".json")) == 1005
+def test_alerts_when_instance_runs_too_long(monkeypatch, sent):
+    launch_time = datetime.now(timezone.utc) - timedelta(
+        hours=main.MAX_RUNTIME_HOURS + 1
+    )
+    monkeypatch.setattr(
+        main,
+        "find_instance",
+        lambda _: {
+            "InstanceId": "i-stuck",
+            "State": {"Name": "running"},
+            "LaunchTime": launch_time,
+        },
+    )
+
+    main.alert_stuck_instance(object())
+
+    assert len(sent) == 1
+    assert sent[0][0] == "EC2 dziala za dlugo"
+    assert sent[0][2] == "high"
+
+
+def test_list_ids_reads_every_paginator_page():
+    class FakePaginator:
+        def paginate(self, **kwargs):
+            assert kwargs == {
+                "Bucket": "test-bucket",
+                "Prefix": "transcripts/raw/",
+            }
+            return [
+                {
+                    "Contents": [
+                        {"Key": "transcripts/raw/first.json"},
+                        {"Key": "transcripts/raw/nested/ignored.json"},
+                    ]
+                },
+                {"Contents": [{"Key": "transcripts/raw/second.json"}]},
+            ]
+
+    class FakeS3:
+        def get_paginator(self, operation):
+            assert operation == "list_objects_v2"
+            return FakePaginator()
+
+    assert main.list_ids(FakeS3(), "transcripts/raw/", ".json") == {
+        "first",
+        "second",
+    }

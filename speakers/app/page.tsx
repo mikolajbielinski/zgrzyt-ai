@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type SpeakerExample = {
   text: string;
@@ -53,11 +53,7 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
         className="w-full max-w-sm space-y-4 rounded-lg border border-gray-800 bg-gray-900 p-8"
       >
         <h1 className="text-xl font-semibold text-gray-100">Zaloguj się</h1>
-        {error && (
-          <p className="rounded bg-red-900/50 px-3 py-2 text-sm text-red-300">
-            {error}
-          </p>
-        )}
+        {error && <p className="rounded bg-red-900/50 px-3 py-2 text-sm text-red-300">{error}</p>}
         <div className="space-y-2">
           <input
             type="text"
@@ -102,19 +98,22 @@ function LabelingUI() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const prefetchRef = useRef<FileData | null | "done">(null);
 
-  function applyFileData(data: FileData) {
+  const applyFileData = useCallback((data: FileData) => {
     setFileData(data);
     setMapping({});
     setVisibleCount({});
-    const firstTs = Object.values(data.speakers as Record<string, SpeakerInfo>)[0]?.examples[0]?.timestamp ?? 0;
+    const firstTs =
+      Object.values(data.speakers as Record<string, SpeakerInfo>)[0]?.examples[0]?.timestamp ?? 0;
     setYtTimestamp(Math.floor(firstTs));
-  }
+  }, []);
 
-  async function prefetchNext(currentId: string, dir: "asc" | "desc") {
+  const prefetchNext = useCallback(async (currentId: string, dir: "asc" | "desc") => {
     setPrefetched(false);
     prefetchRef.current = null;
     try {
-      const res = await fetch(`/api/files/next?direction=${dir}&exclude=${encodeURIComponent(currentId)}`);
+      const res = await fetch(
+        `/api/files/next?direction=${dir}&exclude=${encodeURIComponent(currentId)}`,
+      );
       if (!res.ok) return;
       const data = await res.json();
       if (data.done) {
@@ -126,52 +125,66 @@ function LabelingUI() {
     } catch {
       // prefetch failed silently — will fall back to normal load
     }
-  }
+  }, []);
 
-  async function loadNext(dir?: "asc" | "desc") {
-    const d = dir ?? direction;
+  const fetchAndApplyNext = useCallback(
+    async (dir: "asc" | "desc") => {
+      try {
+        const res = await fetch(`/api/files/next?direction=${dir}`);
+        if (!res.ok) {
+          setError("Błąd ładowania pliku z S3");
+          return;
+        }
 
-    // If we have prefetched data, use it instantly
-    if (prefetchRef.current) {
-      if (prefetchRef.current === "done") {
-        setDone(true);
+        const data = await res.json();
+        if (data.done) {
+          setDone(true);
+          return;
+        }
+
+        applyFileData(data);
+        void prefetchNext(data.id, dir);
+      } catch {
+        setError("Błąd ładowania pliku z S3");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [applyFileData, prefetchNext],
+  );
+
+  const loadNext = useCallback(
+    async (dir: "asc" | "desc") => {
+      // If we have prefetched data, use it instantly
+      if (prefetchRef.current) {
+        if (prefetchRef.current === "done") {
+          setDone(true);
+          prefetchRef.current = null;
+          setPrefetched(false);
+          return;
+        }
+        const next = prefetchRef.current;
         prefetchRef.current = null;
         setPrefetched(false);
+        applyFileData(next);
+        setLoading(false);
+        // Prefetch the one after this
+        void prefetchNext(next.id, dir);
         return;
       }
-      const next = prefetchRef.current;
-      prefetchRef.current = null;
-      setPrefetched(false);
-      applyFileData(next);
-      setLoading(false);
-      // Prefetch the one after this
-      prefetchNext(next.id, d);
-      return;
-    }
 
-    setLoading(true);
-    setError("");
-    setMapping({});
-    setVisibleCount({});
-    const res = await fetch(`/api/files/next?direction=${d}`);
-    setLoading(false);
-    if (!res.ok) {
-      setError("Błąd ładowania pliku z S3");
-      return;
-    }
-    const data = await res.json();
-    if (data.done) {
-      setDone(true);
-      return;
-    }
-    applyFileData(data);
-    // Start prefetching the next one in the background
-    prefetchNext(data.id, d);
-  }
+      setLoading(true);
+      setError("");
+      setMapping({});
+      setVisibleCount({});
+      await fetchAndApplyNext(dir);
+    },
+    [applyFileData, fetchAndApplyNext, prefetchNext],
+  );
 
   useEffect(() => {
-    loadNext();
-  }, []);
+    void fetchAndApplyNext("desc");
+  }, [fetchAndApplyNext]);
 
   function setTimestamp(ts: number) {
     setYtTimestamp(Math.floor(ts));
@@ -196,14 +209,12 @@ function LabelingUI() {
     // Reset prefetch — skipped cookies change the order
     prefetchRef.current = null;
     setPrefetched(false);
-    loadNext();
+    void loadNext(direction);
   }
 
   async function handleSave() {
     if (!fileData) return;
-    const allFilled = Object.keys(fileData.speakers).every(
-      (s) => mapping[s]?.trim()
-    );
+    const allFilled = Object.keys(fileData.speakers).every((s) => mapping[s]?.trim());
     if (!allFilled) {
       setError("Uzupełnij ksywki dla wszystkich speakerów");
       return;
@@ -220,7 +231,7 @@ function LabelingUI() {
       setError("Błąd zapisywania na S3");
       return;
     }
-    loadNext();
+    await loadNext(direction);
   }
 
   if (loading) {
@@ -250,9 +261,7 @@ function LabelingUI() {
     );
   }
 
-  const speakerEntries = Object.entries(fileData.speakers).sort(([a], [b]) =>
-    a.localeCompare(b)
-  );
+  const speakerEntries = Object.entries(fileData.speakers).sort(([a], [b]) => a.localeCompare(b));
 
   const ytSrc = `https://www.youtube.com/embed/${fileData.id}?start=${ytTimestamp}&autoplay=0`;
 
@@ -270,10 +279,14 @@ function LabelingUI() {
                 // Reset prefetch — direction change invalidates it
                 prefetchRef.current = null;
                 setPrefetched(false);
-                loadNext(next);
+                void loadNext(next);
               }}
               className="rounded border border-gray-700 px-2 py-1 text-xs text-gray-400 hover:border-gray-500 hover:text-gray-200"
-              title={direction === "desc" ? "Od tyłu (kliknij aby od początku)" : "Od początku (kliknij aby od tyłu)"}
+              title={
+                direction === "desc"
+                  ? "Od tyłu (kliknij aby od początku)"
+                  : "Od początku (kliknij aby od tyłu)"
+              }
             >
               {direction === "desc" ? "↑ od tyłu" : "↓ od początku"}
             </button>
@@ -281,7 +294,10 @@ function LabelingUI() {
               {fileData.id}
             </span>
             {prefetched && (
-              <span className="rounded bg-green-900/50 px-2 py-1 text-xs text-green-400" title="Następny odcinek gotowy">
+              <span
+                className="rounded bg-green-900/50 px-2 py-1 text-xs text-green-400"
+                title="Następny odcinek gotowy"
+              >
                 ✓ next
               </span>
             )}
@@ -289,21 +305,14 @@ function LabelingUI() {
         </div>
 
         {error && (
-          <p className="mb-4 rounded bg-red-900/50 px-3 py-2 text-sm text-red-300">
-            {error}
-          </p>
+          <p className="mb-4 rounded bg-red-900/50 px-3 py-2 text-sm text-red-300">{error}</p>
         )}
 
         <div className="space-y-5 flex-1">
           {speakerEntries.map(([speakerId, info]) => (
-            <div
-              key={speakerId}
-              className="rounded-lg border border-gray-800 bg-gray-900 p-4"
-            >
+            <div key={speakerId} className="rounded-lg border border-gray-800 bg-gray-900 p-4">
               <div className="mb-3">
-                <span className="font-mono text-sm font-medium text-blue-400">
-                  {speakerId}
-                </span>
+                <span className="font-mono text-sm font-medium text-blue-400">{speakerId}</span>
               </div>
               <div className="mb-3 space-y-2">
                 {info.examples.slice(0, visibleCount[speakerId] ?? 3).map((ex, i) => (
@@ -330,7 +339,8 @@ function LabelingUI() {
                     }
                     className="text-xs text-blue-400 hover:text-blue-300"
                   >
-                    + Załaduj 5 więcej ({info.examples.length - (visibleCount[speakerId] ?? 3)} pozostało)
+                    + Załaduj 5 więcej ({info.examples.length - (visibleCount[speakerId] ?? 3)}{" "}
+                    pozostało)
                   </button>
                 )}
               </div>
@@ -338,9 +348,7 @@ function LabelingUI() {
                 type="text"
                 placeholder="Wpisz ksywkę..."
                 value={mapping[speakerId] ?? ""}
-                onChange={(e) =>
-                  setMapping((prev) => ({ ...prev, [speakerId]: e.target.value }))
-                }
+                onChange={(e) => setMapping((prev) => ({ ...prev, [speakerId]: e.target.value }))}
                 className="w-full rounded border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:border-blue-500 focus:outline-none"
               />
             </div>
@@ -382,9 +390,7 @@ function LabelingUI() {
 
 // ---- Root page ----
 export default function Page() {
-  const [authState, setAuthState] = useState<"loading" | "login" | "app">(
-    "loading"
-  );
+  const [authState, setAuthState] = useState<"loading" | "login" | "app">("loading");
 
   useEffect(() => {
     fetch("/api/auth/check")

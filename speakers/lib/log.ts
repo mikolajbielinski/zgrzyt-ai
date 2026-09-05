@@ -21,8 +21,7 @@ export function logError(scope: Scope, message: string, err: unknown): void {
     parts.push(String(err));
   }
 
-  const meta = (err as { $metadata?: { httpStatusCode?: number; requestId?: string } })
-    .$metadata;
+  const meta = (err as { $metadata?: { httpStatusCode?: number; requestId?: string } }).$metadata;
   if (meta?.httpStatusCode) parts.push(`http=${meta.httpStatusCode}`);
   if (meta?.requestId) parts.push(`requestId=${meta.requestId}`);
 

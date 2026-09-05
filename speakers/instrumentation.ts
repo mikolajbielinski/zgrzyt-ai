@@ -7,6 +7,6 @@ export function register() {
     logInfo("startup", "all required environment variables present");
   } catch (error) {
     logError("startup", "refusing to start", error);
-    process.exit(1);
+    throw error;
   }
 }

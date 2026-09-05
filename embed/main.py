@@ -118,8 +118,12 @@ def chunk_transcript(segments, youtube_id, max_tokens, tokenizer):
         if chunk_tokens + utt_tokens > max_tokens and chunk_utterances:
             chunks.append(_build_chunk(chunk_utterances, youtube_id, len(chunks)))
             last = chunk_utterances[-1]
-            chunk_utterances = [last]
-            chunk_tokens = last["tokens"]
+            if last["tokens"] + utt_tokens <= max_tokens:
+                chunk_utterances = [last]
+                chunk_tokens = last["tokens"]
+            else:
+                chunk_utterances = []
+                chunk_tokens = 0
 
         chunk_tokens += utt_tokens
         chunk_utterances.append({**utt, "formatted": formatted, "tokens": utt_tokens})
@@ -132,7 +136,7 @@ def chunk_transcript(segments, youtube_id, max_tokens, tokenizer):
 
 def _build_chunk(utterances, youtube_id, index):
     text = "\n".join(u["formatted"] for u in utterances)
-    speakers = list({u["speaker"] for u in utterances})
+    speakers = list(dict.fromkeys(u["speaker"] for u in utterances))
     return {
         "text": text,
         "youtube_id": youtube_id,
@@ -196,7 +200,9 @@ def store_chunks(qdrant, cfg, chunks, embeddings):
         )
 
     for i in range(0, len(points), 100):
-        qdrant.upsert(collection_name=cfg["collection_name"], points=points[i : i + 100])
+        qdrant.upsert(
+            collection_name=cfg["collection_name"], points=points[i : i + 100]
+        )
 
 
 def main():
@@ -210,7 +216,12 @@ def main():
     ensure_collection(qdrant, cfg)
 
     transcript_ids = list_transcripts(s3, cfg)
-    log.info("Found %d transcripts in s3://%s/%s", len(transcript_ids), cfg["s3_bucket"], cfg["s3_prefix"])
+    log.info(
+        "Found %d transcripts in s3://%s/%s",
+        len(transcript_ids),
+        cfg["s3_bucket"],
+        cfg["s3_prefix"],
+    )
 
     embedded = list_embedded_ids(qdrant, cfg)
     log.info("Already in Qdrant: %d", len(embedded))

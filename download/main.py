@@ -96,7 +96,10 @@ def download_audio(videos, output_dir=None):
             if "ExtractAudio" not in postprocessor:
                 return
 
-            if status in {"started", "processing"} and conversion_state["started_at"] is None:
+            if (
+                status in {"started", "processing"}
+                and conversion_state["started_at"] is None
+            ):
                 conversion_state["started_at"] = time.monotonic()
             elif status == "finished" and conversion_state["started_at"] is not None:
                 elapsed = time.monotonic() - conversion_state["started_at"]
