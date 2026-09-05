@@ -58,7 +58,6 @@ jobs:
             enable-cache: true
             working-directory: ${{matrix.components}}
         - name: Install dependencies
-          if: steps.setup-uv.outputs.cache-hit != 'true'
           run: uv sync --locked --only-dev
         - name: Run checks
           run: | 
@@ -92,7 +91,6 @@ jobs:
               ~/.bun/install/cache
             key: ${{ matrix.components }}-bun-${{ hashFiles(format('{0}/bun.lock', matrix.components)) }}
         - name: Install dependencies
-          if: steps.cache.outputs.cache-hit != 'true'
           run: bun ci
         - name: Run checks
           run: |
