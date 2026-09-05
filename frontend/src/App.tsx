@@ -77,7 +77,7 @@ export default function App() {
           const detail = error?.detail || "Wystąpił błąd. Spróbuj ponownie.";
           const suggestReset = res.status === 429 || detail.includes("sesję");
           const content = suggestReset
-            ? `${detail}\n\nKliknij przycisk **Resetuj Sesję** w górnym menu, aby rozpocząć nową rozmowę.`
+            ? `${detail}\n\nKliknij przyciskk **Resetuj Sesję** w górnym menu, aby rozpocząć nową rozmowę.`
             : detail;
 
           setMessages((prev) => {
