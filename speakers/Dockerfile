@@ -1,31 +1,31 @@
-ARG NODE_VERSION=24.13.0-alpine
+ARG BUN_VERSION=1.4.2
 
-FROM node:${NODE_VERSION} AS deps
+FROM oven/bun:${BUN_VERSION}-alpine AS deps
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci --no-audit --no-fund
+COPY package.json bun.lock ./
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    bun ci
 
-FROM node:${NODE_VERSION} AS builder
+FROM oven/bun:${BUN_VERSION}-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+RUN bun run build
 
-FROM node:${NODE_VERSION} AS runner
+FROM oven/bun:${BUN_VERSION}-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-COPY --from=builder --chown=node:node /app/public ./public
-RUN mkdir .next && chown node:node .next
-COPY --from=builder --chown=node:node /app/.next/standalone ./
-COPY --from=builder --chown=node:node /app/.next/static ./.next/static
+COPY --from=builder --chown=bun:bun /app/public ./public
+RUN mkdir .next && chown bun:bun .next
+COPY --from=builder --chown=bun:bun /app/.next/standalone ./
+COPY --from=builder --chown=bun:bun /app/.next/static ./.next/static
 
-USER node
+USER bun
 EXPOSE 3000
-CMD ["node", "server.js"]
+CMD ["bun", "server.js"]

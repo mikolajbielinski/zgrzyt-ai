@@ -76,10 +76,10 @@ remembered between runs.
 |---|---|---|---|
 | `download/` | Fetches the newest episode from the channel and converts it to MP3 | Python, yt-dlp, ffmpeg | CronJob, hourly |
 | `orchestrator/` | Decides whether the GPU machine should be awake; sends notifications | Python, boto3 | CronJob, every 15 min |
-| `speakers/` | Web app where I put a name to each anonymous speaker | Next.js 16, React 19 | Deployment |
+| `speakers/` | Web app where I put a name to each anonymous speaker | Next.js 16, React 19, Bun | Deployment |
 | `embed/` | Chunks labelled transcripts, embeds them, upserts into Qdrant | Python, tiktoken, OpenAI | CronJob, hourly |
 | `backend/` | Retrieval and answer generation | FastAPI | Deployment |
-| `frontend/` | Chat UI | React 19, Vite, Tailwind 4 | Deployment, behind nginx |
+| `frontend/` | Chat UI | React 19, Vite, Tailwind 4, Bun | Deployment, behind nginx |
 
 Two more pieces live in the homelab repo rather than here, because they are configuration and
 not code: the **reconciler** (an `aws-cli` container that syncs the PVC to S3) and the
@@ -165,10 +165,8 @@ OpenAI bills me. The daily window rolls at 17:00 Warsaw time rather than midnigh
 
 - **Images are tagged `:latest`.** Deploying is a manual `rollout restart` and there is no record
   of which build is live. CI already emits `sha-` tags; the manifests just do not use them yet.
-- **The tests are not run in CI.** `embed/` and `orchestrator/` have unit tests. The workflow
-  builds images and never invokes pytest.
-- **Python dependencies are not pinned** except in `orchestrator/`. This has already bitten me
-  once, when a new yt-dlp release broke channel listing.
+- **The tests are not run in CI.** Every component has basic unit tests, but the workflow builds
+  images without running them.
 - **Auth in the speakers app is weak** — the session token is `base64(secret:user)` and routes
   only check that the cookie exists. It sits behind HTTP Basic Auth in `proxy.ts`, which is what
   actually protects it. The right fix is an identity proxy in front, not more cookie logic.
