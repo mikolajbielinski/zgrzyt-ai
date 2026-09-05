@@ -45,7 +45,7 @@ jobs:
           working-directory: ${{ matrix.components }}
       steps:
         - name: Checkout code
-          uses: action/checkout@v7
+          uses: actions/checkout@v7
         - name: Install UV
           run: curl -LsSf https://astral.sh/uv/install.sh | sh
         - name: Install dependencies
