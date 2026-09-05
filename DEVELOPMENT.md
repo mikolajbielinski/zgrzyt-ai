@@ -1,96 +1,168 @@
-# Lokalna praca
+# Development guide
 
-Polecenia poniżej należy uruchamiać z głównego katalogu repozytorium, chyba że
-przy danym poleceniu podano inaczej.
+Dokument opisuje lokalne przygotowanie środowiska, uruchamianie testów oraz
+kontrolę jakości kodu w repozytorium `zgrzyt-ai`.
 
-## Pierwsza instalacja
+## Wymagane narzędzia
 
-Potrzebne są dwa narzędzia dostępne w `PATH`:
+- [uv](https://docs.astral.sh/uv/) — zarządzanie projektami i zależnościami
+  Pythona,
+- [Bun](https://bun.com/docs) 1.4.2 — runtime, menedżer zależności i runner
+  testów JavaScript/TypeScript,
+- Docker — opcjonalnie, do lokalnego budowania obrazów.
+
+Poprawność instalacji można sprawdzić poleceniami:
 
 ```bash
 uv --version
 bun --version
+docker --version
 ```
 
-`uv` sam tworzy i aktualizuje `.venv` wewnątrz danego komponentu. Nie
-aktywujemy go i nie instalujemy zależności przez `pip`. Pierwsze `uv run`
-automatycznie zsynchronizuje środowisko z `pyproject.toml` i `uv.lock`.
+## Organizacja zależności
 
-Zależności TypeScriptu instalujemy osobno w obu aplikacjach:
+Każdy komponent jest niezależnym projektem i posiada własny lockfile:
+
+| Komponenty | Konfiguracja | Lockfile |
+| --- | --- | --- |
+| `backend`, `download`, `embed`, `orchestrator` | `pyproject.toml` | `uv.lock` |
+| `frontend`, `speakers` | `package.json` | `bun.lock` |
+
+uv automatycznie tworzy katalog `.venv` wewnątrz komponentu. Środowiska nie
+trzeba aktywować — polecenia projektu są uruchamiane przez `uv run`.
+
+## Instalacja zależności
+
+Python — przykład dla komponentu `embed`:
 
 ```bash
-(cd frontend && bun install --frozen-lockfile)
-(cd speakers && bun install --frozen-lockfile)
+cd embed
+uv sync
 ```
 
-Po zmianie zależności uruchamiamy `bun install`, aby zaktualizować
-`bun.lock`. W automatyzacji i podczas kontroli czystej instalacji używamy
-`bun ci`.
+Analogiczne polecenie można uruchomić w `backend`, `download` lub
+`orchestrator`. Pierwsze użycie `uv run` również automatycznie wykona
+synchronizację środowiska.
+
+JavaScript/TypeScript:
+
+```bash
+cd frontend
+bun ci
+```
+
+```bash
+cd speakers
+bun ci
+```
+
+`bun ci` instaluje dokładnie wersje zapisane w `bun.lock` i nie modyfikuje
+lockfile'a.
 
 ## Testy
 
-Każdy komponent Pythona uruchamiamy osobno, ponieważ zawiera własny moduł
-`main.py`:
+Polecenia należy uruchamiać wewnątrz wybranego komponentu.
+
+### Python
 
 ```bash
-for component in backend download embed orchestrator; do
-  (cd "$component" && uv run pytest)
-done
+uv run pytest
 ```
 
-Pojedynczy komponent:
+Przykład:
 
 ```bash
-(cd embed && uv run pytest)
+cd embed
+uv run pytest
 ```
 
-Testy TypeScript:
+### JavaScript/TypeScript
 
 ```bash
-(cd frontend && bun test)
-(cd speakers && bun test)
+bun test
 ```
 
-## Lint i formatowanie
+Polecenie działa zarówno w `frontend`, jak i `speakers`.
 
-Sprawdzenie Pythona bez zmieniania plików:
+## Lintowanie i formatowanie
+
+### Python
+
+Kontrola bez modyfikowania plików:
 
 ```bash
-for component in backend download embed orchestrator; do
-  (cd "$component" && uv run ruff check . && uv run ruff format --check .)
-done
+uv run ruff check .
+uv run ruff format --check .
 ```
 
-Automatyczne poprawki i formatowanie Pythona:
+Automatyczne poprawki i formatowanie:
 
 ```bash
-for component in backend download embed orchestrator; do
-  (cd "$component" && uv run ruff check --fix . && uv run ruff format .)
-done
+uv run ruff check --fix .
+uv run ruff format .
 ```
 
-Sprawdzenie TypeScriptu:
+### JavaScript/TypeScript
+
+Kontrola bez modyfikowania plików:
 
 ```bash
-(cd frontend && bun run lint && bun run format:check)
-(cd speakers && bun run lint && bun run format:check)
+bun run lint
+bun run format:check
 ```
 
-Automatyczne poprawki i formatowanie TypeScriptu:
+Automatyczne poprawki i formatowanie:
 
 ```bash
-(cd frontend && bun run lint:fix && bun run format)
-(cd speakers && bun run lint:fix && bun run format)
+bun run lint:fix
+bun run format
 ```
 
-ESLint potrafi automatycznie naprawić tylko część problemów. Prettier odpowiada
-za układ kodu, ale nie zmienia jego logiki.
+ESLint poprawia wyłącznie obsługiwane reguły. Prettier odpowiada za format kodu
+i nie zmienia jego logiki.
+
+## Lokalny build aplikacji webowych
+
+W katalogu `frontend` lub `speakers`:
+
+```bash
+bun run build
+```
+
+## Zmiana zależności
+
+Dodanie zależności uruchomieniowej Pythona:
+
+```bash
+uv add <pakiet>
+```
+
+Dodanie zależności deweloperskiej Pythona:
+
+```bash
+uv add --dev <pakiet>
+```
+
+Dodanie zależności JavaScript/TypeScript:
+
+```bash
+bun add <pakiet>
+```
+
+Dodanie zależności deweloperskiej JavaScript/TypeScript:
+
+```bash
+bun add --dev <pakiet>
+```
+
+Powyższe polecenia aktualizują jednocześnie konfigurację projektu i właściwy
+lockfile. Zmiany w `pyproject.toml` lub `package.json` powinny być commitowane
+razem z odpowiadającym im `uv.lock` lub `bun.lock`.
 
 ## Kontrola przed commitem
 
-Po testach i lintowaniu warto sprawdzić również build obu aplikacji:
+Dla każdego zmienionego komponentu należy wykonać:
 
-```bash
-(cd frontend && bun run build)
-(cd speakers && bun run build)
-```
+1. testy,
+2. lintowanie i kontrolę formatowania,
+3. build — jeśli zmieniany był `frontend` albo `speakers`.
