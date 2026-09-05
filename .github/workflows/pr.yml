@@ -55,6 +55,7 @@ jobs:
           with:
             version: "0.10.7"
             enable-cache: true
+            working-directory: ${{matrix.components}}
         - name: Install dependencies
           run: uv sync --locked --only-dev
         - name: Run checks
