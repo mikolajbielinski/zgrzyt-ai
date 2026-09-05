@@ -53,6 +53,7 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
         className="w-full max-w-sm space-y-4 rounded-lg border border-gray-800 bg-gray-900 p-8"
       >
         <h1 className="text-xl font-semibold text-gray-100">Zaloguj się</h1>
+        <p>nowy tekst<p>
         {error && <p className="rounded bg-red-900/50 px-3 py-2 text-sm text-red-300">{error}</p>}
         <div className="space-y-2">
           <input
