@@ -3,6 +3,6 @@
     "frontend": "1.0.0",
     "backend": "1.0.0",
     "download": "1.0.0",
-    "orchestrator": "1.0.0",
+    "orchestrator": "1.1.0",
     "speakers": "1.0.0"
 }
