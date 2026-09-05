@@ -25,15 +25,28 @@ jobs:
                 - 'embed/**'
               backend:
                 - 'backend/**'
+              orchestrator:
+                - 'orchestrator/**'
               frontend:
                 - 'frontend/**'
               speakers:
                 - 'speakers/**'
-              orchestrator:
-                - 'orchestrator/**'
-    python_check:
+    python-check:
       needs: changes
       runs-on: ubuntu-latest
+      strategy:
+        matrix:
+          components: ${{ fromJson(needs.changes.outputs.components-changed) }}
+          exclude: 
+            - components: frontend
+            - components: speakers
+      defaults:
+        run:
+          working-directory: ${{ matrix.components }}
       steps:
-        - name: Show filters output
-          run: echo " ${{ toJson(needs.changes.outputs.components-changed) }} "
+        - name: Checkout code
+          uses: action/checkout@v7
+        - name: Install UV
+          run: curl -LsSf https://astral.sh/uv/install.sh | sh
+        - name: Install dependencies
+          run: uv sync --locked && ls
