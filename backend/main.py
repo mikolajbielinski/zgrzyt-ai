@@ -20,6 +20,7 @@ from qdrant_client.models import (
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+
 log = logging.getLogger(__name__)
 
 REQUIRED_ENV_VARS = [
