@@ -46,13 +46,15 @@ jobs:
       steps:
         - name: Checkout code
           uses: actions/checkout@v7
-        - name: Install UV
-          run: curl -LsSf https://astral.sh/uv/install.sh | sh
-        - name: Cache dependencies
-          uses: actions/cache@v6
+        - name: Set up Python
+          uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
           with:
-            path: ~/.cache/pip
-            key: ${{ matrix.components }}-pip-${{ hashFiles('**/uv.lock') }}
+            python-version-file: "pyproject.toml"
+        - name: Install UV
+          uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
+          with:
+            version: "0.10.7"
+            enable-cache: true
         - name: Install dependencies
           run: uv sync --locked --only-dev
         - name: Run checks
