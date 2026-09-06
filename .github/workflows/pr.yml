@@ -56,7 +56,7 @@ jobs:
           run: |
             merged=$(jq -cn \
             --argjson first "$PYTHON_CHANGES" \
-            --argjson second "JS_CHANGES" \
+            --argjson second "$JS_CHANGES" \
             '$first + $second')
             echo "components=$merged" >> "$GITHUB_OUTPUT"
     python-check:
