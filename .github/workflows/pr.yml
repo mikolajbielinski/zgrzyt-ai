@@ -52,6 +52,7 @@ jobs:
       if: needs.changes.outputs.python-changed != '[]'
       runs-on: ubuntu-latest
       strategy:
+        fail-fast: false
         matrix:
           components: ${{ fromJson(needs.changes.outputs.python-changed) }}
       defaults:
@@ -91,6 +92,7 @@ jobs:
       if: needs.changes.outputs.js-changed != '[]'
       runs-on: ubuntu-latest
       strategy:
+        fail-fast: false
         matrix:
           components: ${{ fromJson(needs.changes.outputs.js-changed) }}
       defaults:
@@ -132,4 +134,18 @@ jobs:
           with:
             context: ${{ matrix.components }}
             push: false
-      
+    ci-ok:
+      needs: [changes, js-check, python-check]
+      if: always()
+      runs-on: ubuntu-latest
+      steps:
+        - name: Check every job
+          run: |
+            changes_success=${{ needs.changes.result == 'success' }}
+            python_check_success=${{ needs.python-check.result == 'success' || needs.python-check.result == 'skipped' }}
+            js_check_success=${{ needs.js-check.result == 'success' || needs.js-check.result == 'skipped' }}
+            if [ $changes_success ] -a [ $python_check_success ] -a [ $js_check_success ]; then
+              exit 0
+            else
+              exit 1
+            fi
