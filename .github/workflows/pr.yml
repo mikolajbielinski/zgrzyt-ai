@@ -14,7 +14,6 @@ jobs:
       outputs:
         python-changed: ${{ steps.changes-python.outputs.changes }}
         js-changed: ${{ steps.changes-js.outputs.changes }}
-        docker-changed: ${{ steps.merge-changes.outputs.components }}
       steps:
         - name: Paths python changes filter
           uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -48,17 +47,6 @@ jobs:
               speakers:
                 - 'speakers/**'
                 - *js_common
-        - name: One array for docker check
-          id: merge-changes
-          env:
-            PYTHON_CHANGES: ${{ steps.changes-python.outputs.changes }}
-            JS_CHANGES: ${{ steps.changes-js.outputs.changes }}
-          run: |
-            merged=$(jq -cn \
-            --argjson first "$PYTHON_CHANGES" \
-            --argjson second "$JS_CHANGES" \
-            '$first + $second')
-            echo "components=$merged" >> "$GITHUB_OUTPUT"
     python-check:
       needs: changes
       if: needs.changes.outputs.python-changed != '[]'
@@ -91,6 +79,13 @@ jobs:
         - name: Run format check
           if: ${{ !cancelled() && steps.install.outcome == 'success' }}
           run: uv run --no-sync ruff format --check
+        - name: Set up Docker Buildx
+          uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        - name: Build docker
+          uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+          with:
+            file: ${{ matrix.components }}/Dockerfile
+            push: false
     js-check:
       needs: changes
       if: needs.changes.outputs.js-changed != '[]'
@@ -130,14 +125,11 @@ jobs:
         - name: Run build
           if: ${{ !cancelled() && steps.install.outcome == 'success' }}
           run: bun run build
-    docker-check:
-      runs-on: ubuntu-latest
-      if: ${{ !cancelled() && needs.changes.result == 'success' && (needs.js-check.result == 'success' || needs.js-check.result == 'skipped') && (needs.python-check.result == 'success' || needs.python-check.result == 'skipped') }}
-      needs:
-        - changes
-        - python-check
-        - js-check
-      steps:
-        - name: Test merge
-          run: echo ${{ needs.changes.outputs.docker-changed }}
+        - name: Set up Docker Buildx
+          uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        - name: Build docker
+          uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+          with:
+            file: ${{ matrix.components }}/Dockerfile
+            push: false
       
