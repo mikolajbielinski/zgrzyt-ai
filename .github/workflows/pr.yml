@@ -144,7 +144,9 @@ jobs:
             changes_success=${{ needs.changes.result == 'success' }}
             python_check_success=${{ needs.python-check.result == 'success' || needs.python-check.result == 'skipped' }}
             js_check_success=${{ needs.js-check.result == 'success' || needs.js-check.result == 'skipped' }}
-            if [ $changes_success ] -a [ $python_check_success ] -a [ $js_check_success ]; then
+            if [ "$changes_success" = "true" ] && \
+              [ "$python_check_success" = "true" ] && \
+              [ "$js_check_success" = "true" ]; then
               exit 0
             else
               exit 1
