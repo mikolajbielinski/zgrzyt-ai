@@ -21,13 +21,19 @@ jobs:
           with:
             filters: |
               download:
-              - 'download/**'
+                - 'download/**'
+                - &python_common
+                  - '.github/workflows/**'
+                  - '.ruff.toml'
               embed:
                 - 'embed/**'
+                - *python_common
               backend:
                 - 'backend/**'
+                - *python_common
               orchestrator:
                 - 'orchestrator/**'
+                - *python_common
         - name: Paths js changes filter
           uses: dorny/paths-filter@v4.0.3
           id: changes-js
@@ -35,11 +41,15 @@ jobs:
             filters: |
               frontend:
                 - 'frontend/**'
+                - &js_common
+                  - '.github/workflows/**'
+                  - '.prettierrc.json'
               speakers:
                 - 'speakers/**'
+                - *js_common
     python-check:
       needs: changes
-      if: ${{ fromJson(needs.changes.outputs.python-changed) != '[]' }}
+      if: needs.changes.outputs.python-changed != '[]'
       runs-on: ubuntu-latest
       strategy:
         matrix:
@@ -58,15 +68,20 @@ jobs:
             enable-cache: true
             working-directory: ${{matrix.components}}
         - name: Install dependencies
+          id: install
           run: uv sync --locked
-        - name: Run checks
-          run: | 
-            uv run --no-sync pytest 
-            uv run --no-sync ruff check 
-            uv run --no-sync ruff format --check 
+        - name: Run test
+          if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+          run: uv run --no-sync pytest 
+        - name: Run lint
+          if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+          run: uv run --no-sync ruff check
+        - name: Run format check
+          if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+          run: uv run --no-sync ruff format --check
     js-check:
       needs: changes
-      if: ${{ fromJson(needs.changes.outputs.js-changed) != '[]' }}
+      if: needs.changes.outputs.js-changed != '[]'
       runs-on: ubuntu-latest
       strategy:
         matrix:
@@ -89,10 +104,20 @@ jobs:
               ~/.bun/install/cache
             key: ${{ matrix.components }}-bun-${{ hashFiles(format('{0}/bun.lock', matrix.components)) }}
         - name: Install dependencies
+          id: install
           run: bun ci
-        - name: Run checks
-          run: |
-            bun test
+        - name: Run test
+          if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+          run: bun test
             bun run lint
             bun run format:check
             bun run build
+        - name: Run lint
+          if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+          run: bun run lint
+        - name: Run format check
+          if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+          run: bun run format:check
+        - name: Run build
+          if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+          run: bun run build
