@@ -12,11 +12,12 @@ jobs:
       permissions: 
         pull-requests: read
       outputs:
-        components-changed: ${{ steps.changes.outputs.changes }}
+        python-changed: ${{ steps.changes-python.outputs.changes }}
+        js-changed: ${{ steps.changes-js.outputs.changes }}
       steps:
-        - name: Paths Changes Filter
+        - name: Paths python changes filter
           uses: dorny/paths-filter@v4.0.3
-          id: changes
+          id: changes-python
           with:
             filters: |
               download:
@@ -27,19 +28,22 @@ jobs:
                 - 'backend/**'
               orchestrator:
                 - 'orchestrator/**'
+        - name: Paths js changes filter
+          uses: dorny/paths-filter@v4.0.3
+          id: changes-js
+          with: 
+            filters: |
               frontend:
                 - 'frontend/**'
               speakers:
                 - 'speakers/**'
     python-check:
       needs: changes
+      if: ${{ fromJson(needs.changes.outputs.python-changed) != '[]' }}
       runs-on: ubuntu-latest
       strategy:
         matrix:
-          components: ${{ fromJson(needs.changes.outputs.components-changed) }}
-          exclude: 
-            - components: frontend
-            - components: speakers
+          components: ${{ fromJson(needs.changes.outputs.python-changed) }}
       defaults:
         run:
           working-directory: ${{ matrix.components }}
@@ -57,20 +61,16 @@ jobs:
           run: uv sync --locked
         - name: Run checks
           run: | 
-            uv run --locked pytest 
-            uv run --locked ruff check 
-            uv run --locked ruff format --check 
+            uv run --no-sync pytest 
+            uv run --no-sync ruff check 
+            uv run --no-sync ruff format --check 
     js-check:
-      runs-on: ubuntu-latest
       needs: changes
+      if: ${{ fromJson(needs.changes.outputs.js-changed) != '[]' }}
+      runs-on: ubuntu-latest
       strategy:
         matrix:
-          components: ${{ fromJson(needs.changes.outputs.components-changed) }}
-          exclude: 
-            - components: backend
-            - components: download
-            - components: embed
-            - components: orchestrator
+          components: ${{ fromJson(needs.changes.outputs.js-changed) }}
       defaults:
         run:
           working-directory: ${{ matrix.components }}
