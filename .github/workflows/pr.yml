@@ -1,0 +1,157 @@
+name: Test code on PR
+on:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+    outputs:
+      python-changed: ${{ steps.changes-python.outputs.changes }}
+      js-changed: ${{ steps.changes-js.outputs.changes }}
+    steps:
+      - name: Paths python changes filter
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: changes-python
+        with:
+          filters: |
+            download:
+              - 'download/**'
+              - &python_common
+                - '.github/workflows/**'
+                - '.ruff.toml'
+            embed:
+              - 'embed/**'
+              - *python_common
+            backend:
+              - 'backend/**'
+              - *python_common
+            orchestrator:
+              - 'orchestrator/**'
+              - *python_common
+      - name: Paths js changes filter
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: changes-js
+        with:
+          filters: |
+            frontend:
+              - 'frontend/**'
+              - &js_common
+                - '.github/workflows/**'
+                - '.prettierrc.json'
+            speakers:
+              - 'speakers/**'
+              - *js_common
+  python-check:
+    needs: changes
+    if: needs.changes.outputs.python-changed != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        components: ${{ fromJson(needs.changes.outputs.python-changed) }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.components }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Setup uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        id: setup-uv
+        with:
+          version: "0.10.7"
+          enable-cache: true
+          working-directory: ${{matrix.components}}
+      - name: Install dependencies
+        id: install
+        run: uv sync --locked
+      - name: Run test
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: uv run --no-sync pytest
+      - name: Run lint
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: uv run --no-sync ruff check
+      - name: Run format check
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: uv run --no-sync ruff format --check
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - name: Build docker
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: ${{ matrix.components }}
+          push: false
+  js-check:
+    needs: changes
+    if: needs.changes.outputs.js-changed != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        components: ${{ fromJson(needs.changes.outputs.js-changed) }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.components }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Setup bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version-file: ${{ matrix.components }}/package.json
+      - name: Cache dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            ~/.bun/install/cache
+          key: ${{ matrix.components }}-bun-${{ hashFiles(format('{0}/bun.lock', matrix.components)) }}
+          restore-keys: ${{ matrix.components }}-bun-
+      - name: Install dependencies
+        id: install
+        run: bun ci
+      - name: Run test
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: bun test
+      - name: Run lint
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: bun run lint
+      - name: Run format check
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: bun run format:check
+      - name: Run build
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: bun run build
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - name: Build docker
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: ${{ matrix.components }}
+          push: false
+  ci-ok:
+    needs: [changes, js-check, python-check]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check every job
+        run: |
+          changes_success=${{ needs.changes.result == 'success' }}
+          python_check_success=${{ needs.python-check.result == 'success' || needs.python-check.result == 'skipped' }}
+          js_check_success=${{ needs.js-check.result == 'success' || needs.js-check.result == 'skipped' }}
+          if [ "$changes_success" = "true" ] && \
+            [ "$python_check_success" = "true" ] && \
+            [ "$js_check_success" = "true" ]; then
+            exit 0
+          else
+            exit 1
+          fi

@@ -1,0 +1,108 @@
+name: Build and push Docker images
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+  queue: max
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      contexts: ${{ steps.select-contexts.outputs.contexts }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Detect changed contexts
+        if: github.event_name == 'push'
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: changes
+        with:
+          filters: |
+            download:
+              - 'download/**'
+              - &python_common
+                - '.github/workflows/**'
+                - '.ruff.toml'
+            embed:
+              - 'embed/**'
+              - *python_common
+            backend:
+              - 'backend/**'
+              - *python_common
+            orchestrator:
+              - 'orchestrator/**'
+              - *python_common
+            frontend:
+              - 'frontend/**'
+              - &js_common
+                - '.github/workflows/**'
+                - '.prettierrc.json'
+            speakers:
+              - 'speakers/**'
+              - *js_common
+      - name: Select contexts to build
+        id: select-contexts
+        env:
+          ALL_CONTEXTS: '["download","embed","backend","orchestrator","frontend","speakers"]'
+          CHANGED_CONTEXTS: ${{ steps.changes.outputs.changes }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "contexts=$ALL_CONTEXTS" >> "$GITHUB_OUTPUT"
+          else
+            echo "contexts=$CHANGED_CONTEXTS" >> "$GITHUB_OUTPUT"
+          fi
+  build-and-push:
+    needs: changes
+    if: needs.changes.outputs.contexts != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        context: ${{ fromJSON(needs.changes.outputs.contexts) }}
+      fail-fast: false
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Generate tags
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/mikolajbielinski/zgrzyt-${{ matrix.context }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=main,enable={{is_default_branch}}
+            type=sha,prefix=sha-,format=long,enable={{is_default_branch}}
+      - name: Build and push
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        id: build-and-push
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+      - name: Job summary
+        env:
+          IMAGE: ghcr.io/mikolajbielinski/zgrzyt-${{ matrix.context }}
+          DIGEST: ${{ steps.build-and-push.outputs.digest }}
+        run: |
+          echo "### Docker image" >> "$GITHUB_STEP_SUMMARY"
+          echo "$IMAGE@$DIGEST" >> "$GITHUB_STEP_SUMMARY"
