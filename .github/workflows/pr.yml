@@ -109,9 +109,6 @@ jobs:
         - name: Run test
           if: ${{ !cancelled() && steps.install.outcome == 'success' }}
           run: bun test
-            bun run lint
-            bun run format:check
-            bun run build
         - name: Run lint
           if: ${{ !cancelled() && steps.install.outcome == 'success' }}
           run: bun run lint

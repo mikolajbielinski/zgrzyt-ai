@@ -27,8 +27,8 @@ const transcript: Utterance[] = [
     start: 5,
     end: 6,
     text: "już podpisana",
-    speaker: "Gimper",
-    words: [{ word: "podpisana", speaker: "Gimper" }],
+    speaker: "Gimperr",
+    words: [{ word: "podpisana", speaker: "Gimperr" }],
   },
 ];
 
