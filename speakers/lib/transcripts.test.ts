@@ -35,7 +35,7 @@ const transcript: Utterance[] = [
 describe("transcript speaker mapping", () => {
   it("extracts only unnamed speakers and their examples", () => {
     assert.deepEqual(extractSpeakers(transcript), {
-      SPEAKER_00: {
+      SPEAKER_99: {
         examples: [{ text: "pierwsza wypowiedź", timestamp: 1 }],
       },
       SPEAKER_01: {
