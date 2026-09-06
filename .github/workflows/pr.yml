@@ -132,11 +132,11 @@ jobs:
           run: bun run build
     docker-check:
       runs-on: ubuntu-latest
+      if: ${{ !cancelled() && needs.changes.result == 'success' && (needs.js-check.result == 'success' || needs.js-check.result == 'skipped') && (needs.python-check.result == 'success' || needs.python-check.result == 'skipped') }}
       needs:
         - changes
         - python-check
         - js-check
-      if: !cancelled() && needs.changes.result == 'success' && ((needs.js-check.result == 'success' || needs.js-check.result == 'skipped') && (needs.python-check.result == 'success' || needs.python-check.result == 'skipped'))
       steps:
         - name: Test merge
           run: echo ${{ needs.changes.outputs.docker-changed }}
