@@ -27,15 +27,15 @@ const transcript: Utterance[] = [
     start: 5,
     end: 6,
     text: "już podpisana",
-    speaker: "Gimperr",
-    words: [{ word: "podpisana", speaker: "Gimperr" }],
+    speaker: "Gimper",
+    words: [{ word: "podpisana", speaker: "Gimper" }],
   },
 ];
 
 describe("transcript speaker mapping", () => {
   it("extracts only unnamed speakers and their examples", () => {
     assert.deepEqual(extractSpeakers(transcript), {
-      SPEAKER_00: {
+      SPEAKER_99: {
         examples: [{ text: "pierwsza wypowiedź", timestamp: 1 }],
       },
       SPEAKER_01: {
