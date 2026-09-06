@@ -12,47 +12,59 @@ concurrency:
   queue: max
 jobs:
   changes:
-      runs-on: ubuntu-latest
-      timeout-minutes: 5
-      if: github.ref == 'refs/heads/main'
-      outputs:
-        contexts: ${{ steps.changes.outputs.changes }}
-      steps:
-        - name: Checkout code
-          uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        - name: Paths python changes filter
-          uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
-          id: changes
-          with:
-            filters: |
-              download:
-                - 'download/**'
-                - &python_common
-                  - '.github/workflows/**'
-                  - '.ruff.toml'
-              embed:
-                - 'embed/**'
-                - *python_common
-              backend:
-                - 'backend/**'
-                - *python_common
-              orchestrator:
-                - 'orchestrator/**'
-                - *python_common
-              frontend:
-                - 'frontend/**'
-                - &js_common
-                  - '.github/workflows/**'
-                  - '.prettierrc.json'
-              speakers:
-                - 'speakers/**'
-                - *js_common
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      contexts: ${{ steps.select-contexts.outputs.contexts }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Detect changed contexts
+        if: github.event_name == 'push'
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: changes
+        with:
+          filters: |
+            download:
+              - 'download/**'
+              - &python_common
+                - '.github/workflows/**'
+                - '.ruff.toml'
+            embed:
+              - 'embed/**'
+              - *python_common
+            backend:
+              - 'backend/**'
+              - *python_common
+            orchestrator:
+              - 'orchestrator/**'
+              - *python_common
+            frontend:
+              - 'frontend/**'
+              - &js_common
+                - '.github/workflows/**'
+                - '.prettierrc.json'
+            speakers:
+              - 'speakers/**'
+              - *js_common
+      - name: Select contexts to build
+        id: select-contexts
+        env:
+          ALL_CONTEXTS: '["download","embed","backend","orchestrator","frontend","speakers"]'
+          CHANGED_CONTEXTS: ${{ steps.changes.outputs.changes }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "contexts=$ALL_CONTEXTS" >> "$GITHUB_OUTPUT"
+          else
+            echo "contexts=$CHANGED_CONTEXTS" >> "$GITHUB_OUTPUT"
+          fi
   build-and-push:
     needs: changes
     if: needs.changes.outputs.contexts != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    permissions: 
+    permissions:
       contents: read
       packages: write
     strategy:
@@ -76,6 +88,7 @@ jobs:
         with:
           images: ghcr.io/mikolajbielinski/zgrzyt-${{ matrix.context }}
           tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=main,enable={{is_default_branch}}
             type=sha,prefix=sha-,format=long,enable={{is_default_branch}}
       - name: Build and push
