@@ -9,6 +9,7 @@ concurrency:
 jobs:
     changes:
       runs-on: ubuntu-latest
+      timeout-minutes: 5
       permissions: 
         pull-requests: read
       outputs:
@@ -51,6 +52,7 @@ jobs:
       needs: changes
       if: needs.changes.outputs.python-changed != '[]'
       runs-on: ubuntu-latest
+      timeout-minutes: 10
       strategy:
         fail-fast: false
         matrix:
@@ -91,6 +93,7 @@ jobs:
       needs: changes
       if: needs.changes.outputs.js-changed != '[]'
       runs-on: ubuntu-latest
+      timeout-minutes: 15
       strategy:
         fail-fast: false
         matrix:
@@ -138,6 +141,7 @@ jobs:
       needs: [changes, js-check, python-check]
       if: always()
       runs-on: ubuntu-latest
+      timeout-minutes: 5
       steps:
         - name: Check every job
           run: |
