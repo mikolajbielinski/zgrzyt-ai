@@ -8,7 +8,7 @@ export default function TypingIndicator() {
           <span className="typing-dot block w-2 h-2 rounded-full bg-accent" />
         </div>
         <span className="text-[10px] font-black uppercase tracking-widest text-accent ml-2">
-          Zgrzytopedia przetwarza...
+          Przetwarzanie...
         </span>
       </div>
     </div>
