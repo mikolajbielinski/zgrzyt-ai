@@ -89,6 +89,8 @@ jobs:
         with:
           context: ${{ matrix.components }}
           push: false
+          cache-from: type=gha,version=2,scope=${{ matrix.components }}
+          cache-to: type=gha,version=2,scope=${{ matrix.components }},mode=max,ignore-error=true
   js-check:
     needs: changes
     if: needs.changes.outputs.js-changed != '[]'
@@ -137,6 +139,8 @@ jobs:
         with:
           context: ${{ matrix.components }}
           push: false
+          cache-from: type=gha,version=2,scope=${{ matrix.components }}
+          cache-to: type=gha,version=2,scope=${{ matrix.components }},mode=max,ignore-error=true
   ci-ok:
     needs: [changes, js-check, python-check]
     if: always()

@@ -97,6 +97,8 @@ jobs:
         with:
           context: ${{ matrix.context }}
           push: true
+          cache-from: type=gha,version=2,scope=${{ matrix.context }}
+          cache-to: type=gha,version=2,scope=${{ matrix.context }},mode=max,ignore-error=true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
       - name: Job summary
