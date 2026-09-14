@@ -7,7 +7,6 @@ from typing import Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI, OpenAIError
 from pydantic import BaseModel
 from qdrant_client import QdrantClient
@@ -140,13 +139,6 @@ app = FastAPI(
     docs_url=None,
     redoc_url=None,
     openapi_url=None,
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
 )
 
 
