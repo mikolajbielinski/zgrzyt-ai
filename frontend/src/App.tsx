@@ -6,12 +6,9 @@ import type { Message } from "./types/index.ts";
 const API_URL = "/api";
 const STORAGE_KEY = "zgrzyt-chat-history";
 
-const SUGGESTION_PROMPTS = [
-  "Czym jest efekt spadochroniarza?",
-  "Jak nazywa się polecana aplikacja do eSIM za granicą?",
-];
+const SUGGESTION_PROMPTS = ["Czym jest efekt spadochroniarza?", "Kim jest Bilon?"];
 
-type Limits = { remaining_user: number; remaining_global: number };
+type Limits = { remaining_user: number };
 
 function loadMessages(): Message[] {
   try {
@@ -24,13 +21,6 @@ function loadMessages(): Message[] {
 
 function saveMessages(messages: Message[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
-}
-
-function toApiMessages(messages: Message[]) {
-  return messages.map((m) => ({
-    role: m.role === "bot" ? ("assistant" as const) : ("user" as const),
-    content: m.content,
-  }));
 }
 
 export default function App() {
@@ -64,18 +54,16 @@ export default function App() {
       setIsTyping(true);
 
       try {
-        const history = [...loadMessages(), userMsg];
-
         const res = await fetch(`${API_URL}/ask`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: toApiMessages(history) }),
+          body: JSON.stringify({ question: text }),
         });
 
         if (!res.ok) {
           const error = await res.json().catch(() => null);
           const detail = error?.detail || "Wystąpił błąd. Spróbuj ponownie.";
-          const suggestReset = res.status === 429 || detail.includes("sesję");
+          const suggestReset = detail.includes("sesję");
           const content = suggestReset
             ? `${detail}\n\nKliknij przycisk **Resetuj Sesję** w górnym menu, aby rozpocząć nową rozmowę.`
             : detail;
@@ -137,13 +125,9 @@ export default function App() {
           </div>
           <div className="flex items-center gap-4">
             {limits && (
-              <div className="hidden sm:flex items-center gap-3 text-xs text-white/40 font-medium">
+              <div className="hidden sm:flex items-center text-xs text-white/40 font-medium">
                 <span>
                   Twoje: <span className="text-white/70">{limits.remaining_user}</span>
-                </span>
-                <span className="text-white/20">·</span>
-                <span>
-                  Dzienne: <span className="text-white/70">{limits.remaining_global}</span>
                 </span>
               </div>
             )}
